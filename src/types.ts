@@ -1,7 +1,7 @@
 export interface ActivityEntry {
-  time: string;       // ISO timestamp
-  action: string;     // "read", "write", "exec", "bug", "patch"
-  text: string;       // e.g. "auth.ts +47 lines"
+  time: string;
+  action: string;
+  text: string;
 }
 
 export interface GraphNode {
@@ -16,6 +16,12 @@ export interface GraphNode {
   startedAt: string;
   completedAt: string | null;
   order: number;
+
+  // Knowledge graph fields
+  taskType?: "qa" | "creative" | null;
+  tags?: string[];
+  embedding?: Float32Array | null;
+  fullAnswer?: string | null;
 }
 
 export interface GraphEdge {
@@ -40,6 +46,21 @@ export interface StepBlock {
   name: string;
   why: string;
   expect: string;
+}
+
+export interface TaskBlock {
+  type: "qa" | "creative";
+}
+
+export interface SearchResult {
+  nodeId: string;
+  sessionId: string;
+  label: string;
+  score: number;
+  taskType: "qa" | "creative" | null;
+  tags: string[];
+  fullAnswer: string | null;
+  createdAt: string;
 }
 
 export type SSEEvent =
