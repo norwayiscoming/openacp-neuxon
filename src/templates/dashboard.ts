@@ -18,8 +18,8 @@ export function generateDashboardHtml(): string {
   /* ── LAYOUT ── */
   .layout {
     display: grid;
-    grid-template-columns: 220px 1fr var(--panel-width, 320px);
-    grid-template-rows: 48px 1fr 36px;
+    grid-template-columns: 220px 1fr;
+    grid-template-rows: 48px 1fr var(--panel-height, 220px) 36px;
     height: 100vh;
   }
 
@@ -47,6 +47,7 @@ export function generateDashboardHtml(): string {
   /* ── TOP BAR ── */
   .topbar {
     grid-column: 1 / -1;
+    grid-row: 1;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -91,6 +92,8 @@ export function generateDashboardHtml(): string {
 
   /* ── LEFT PANEL: Steps ── */
   .steps-panel {
+    grid-column: 1;
+    grid-row: 2;
     background: #0d1117;
     border-right: 1px solid #1a2030;
     padding: 20px 16px;
@@ -127,11 +130,15 @@ export function generateDashboardHtml(): string {
     margin-top: 1px;
   }
   .step-content { flex: 1; }
-  .step-name { font-size: 13px; font-weight: 600; margin-bottom: 1px; }
-  .step-desc { font-size: 10px; color: #8b949e; }
+  .step-name { font-size: 15px; font-weight: 600; margin-bottom: 2px; }
+  .step-desc { font-size: 12px; color: #8b949e; }
 
   .step-done .step-marker { background: #00ff41; color: #0a0e14; }
   .step-done .step-name { color: #00ff41; }
+
+  .step-result .step-marker { background: #818cf8; color: #fff; box-shadow: 0 0 12px #818cf860; }
+  .step-result .step-name { color: #a5b4fc; font-weight: 700; }
+  .step-result { background: #818cf810; border-radius: 6px; }
 
   .step-active .step-marker {
     background: #facc15; color: #0a0e14;
@@ -188,43 +195,75 @@ export function generateDashboardHtml(): string {
 
   /* ── CENTER: Graph Canvas ── */
   .graph-area {
+    grid-column: 2;
+    grid-row: 2;
     position: relative;
     background: #0a0e14;
     overflow: hidden;
   }
-  .graph-area canvas { display: block; }
+  .graph-area canvas { display: block; cursor: grab; }
+  .zoom-controls {
+    position: absolute;
+    bottom: 12px;
+    right: 12px;
+    display: flex;
+    gap: 4px;
+    z-index: 20;
+  }
+  .zoom-btn {
+    width: 32px; height: 32px;
+    background: #161b22;
+    border: 1px solid #2a3040;
+    border-radius: 6px;
+    color: #8b949e;
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background .2s;
+  }
+  .zoom-btn:hover { background: #1f2937; color: #e0e0e0; }
 
-  /* ── RIGHT PANEL: Detail ── */
+  /* ── BOTTOM PANEL: Detail ── */
   .detail-panel {
+    grid-column: 1 / -1;
+    grid-row: 3;
     background: #0d1117;
-    border-left: 1px solid #1a2030;
-    padding: 20px 16px;
+    border-top: 1px solid #1a2030;
+    padding: 12px 24px;
     overflow-y: auto;
     position: relative;
-    min-width: 240px;
-    max-width: 500px;
+    min-height: 120px;
+    max-height: 400px;
   }
 
   /* Resize handle */
   .resize-handle {
     position: absolute;
     left: 0;
+    right: 0;
     top: 0;
-    bottom: 0;
-    width: 6px;
-    cursor: col-resize;
+    height: 6px;
+    cursor: row-resize;
     z-index: 10;
     transition: background .2s;
   }
   .resize-handle:hover, .resize-handle.dragging {
     background: #facc1540;
   }
+  .dp-row {
+    display: flex;
+    gap: 24px;
+    align-items: flex-start;
+  }
+  .dp-col { flex: 1; min-width: 0; }
   .dp-header {
     display: flex;
     align-items: center;
     gap: 10px;
-    margin-bottom: 16px;
-    padding-bottom: 14px;
+    margin-bottom: 12px;
+    padding-bottom: 10px;
     border-bottom: 1px solid #1a2030;
   }
   .dp-icon {
@@ -239,8 +278,8 @@ export function generateDashboardHtml(): string {
     font-weight: 700;
     box-shadow: 0 0 16px #facc1530;
   }
-  .dp-title { font-size: 16px; font-weight: 700; color: #facc15; }
-  .dp-subtitle { font-size: 11px; color: #8b949e; }
+  .dp-title { font-size: 18px; font-weight: 700; color: #facc15; }
+  .dp-subtitle { font-size: 13px; color: #8b949e; }
 
   .dp-section { margin-bottom: 16px; }
   .dp-label {
@@ -251,7 +290,7 @@ export function generateDashboardHtml(): string {
     text-transform: uppercase;
     margin-bottom: 6px;
   }
-  .dp-value { font-size: 13px; color: #e0e0e0; line-height: 1.7; }
+  .dp-value { font-size: 14px; color: #e0e0e0; line-height: 1.7; }
   .dp-file {
     display: inline-block;
     background: #1a2030;
@@ -283,10 +322,13 @@ export function generateDashboardHtml(): string {
     background: #111820;
     border: 1px solid #1a2535;
     border-radius: 8px;
-    padding: 12px 14px;
-    font-size: 13px;
+    padding: 14px 16px;
+    font-size: 14px;
     color: #d0d8e0;
     line-height: 1.8;
+    max-height: 160px;
+    overflow-y: auto;
+    white-space: pre-wrap;
   }
   .dp-layman-title {
     font-size: 10px;
@@ -326,7 +368,7 @@ export function generateDashboardHtml(): string {
   }
   .dp-log-line {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
+    font-size: 12px;
     color: #6b7280;
     line-height: 2;
     display: flex;
@@ -356,6 +398,7 @@ export function generateDashboardHtml(): string {
   /* ── BOTTOM BAR ── */
   .bottombar {
     grid-column: 1 / -1;
+    grid-row: 4;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -409,13 +452,12 @@ export function generateDashboardHtml(): string {
 const params = new URLSearchParams(location.search);
 const sessionId = params.get('sessionId');
 
-if (!sessionId) {
-  document.getElementById('app').innerHTML = '<div class="empty-state"><h1>NEUXON</h1><p>No session selected.<br>Open a session and come back, or add <code>?sessionId=xxx</code> to the URL.</p></div>';
-} else {
-  boot(sessionId);
-}
+// No sessionId = show all sessions as knowledge graph
+boot(sessionId);
 
 function boot(sessionId) {
+  const isAllMode = !sessionId;
+  const headerLabel = isAllMode ? 'Knowledge Graph' : ('Session #' + sessionId.slice(0, 4));
   // Render the layout shell
   document.getElementById('app').innerHTML = \`
   <div class="layout">
@@ -423,7 +465,8 @@ function boot(sessionId) {
       <div class="logo">NEUXON</div>
       <div class="topbar-right">
         <span class="live-badge" id="live-badge">LIVE</span>
-        <span>Session #\${sessionId.slice(0, 4)}</span>
+        <span>\${headerLabel}</span>
+        <span id="session-count"></span>
       </div>
     </div>
     <div class="steps-panel" id="steps-panel">
@@ -441,6 +484,11 @@ function boot(sessionId) {
     </div>
     <div class="graph-area">
       <canvas id="graph"></canvas>
+      <div class="zoom-controls">
+        <button class="zoom-btn" id="zoom-in" title="Zoom in">+</button>
+        <button class="zoom-btn" id="zoom-out" title="Zoom out">-</button>
+        <button class="zoom-btn" id="zoom-reset" title="Reset zoom">R</button>
+      </div>
     </div>
     <div class="detail-panel" id="detail-panel">
       <div class="resize-handle" id="resize-handle"></div>
@@ -473,6 +521,8 @@ function boot(sessionId) {
     pending:  { fill:'#4a5a70', bg:'#141a24', text:'#6a7a8e', glow:'#4a5a7010' },
     detour:   { fill:'#ff4444', bg:'#2a0a0a', text:'#ff8888', glow:'#ff444425' },
     resolved: { fill:'#22d3ee', bg:'#0a1a20', text:'#22d3ee', glow:'#22d3ee20' },
+    result:   { fill:'#818cf8', bg:'#1a1040', text:'#a5b4fc', glow:'#818cf840' },
+    cache:    { fill:'#22d3ee', bg:'#0a1a20', text:'#22d3ee', glow:'#22d3ee30' },
   };
 
   // ── CANVAS SETUP ──
@@ -480,6 +530,9 @@ function boot(sessionId) {
   const ctx = canvas.getContext('2d');
   const area = canvas.parentElement;
   let W, H, scale;
+  let zoom = 1;
+  let panX = 0, panY = 0;
+  let isPanning = false, panStartX = 0, panStartY = 0, panStartPanX = 0, panStartPanY = 0;
 
   function resize() {
     const rect = area.getBoundingClientRect();
@@ -495,44 +548,106 @@ function boot(sessionId) {
   resize();
   window.addEventListener('resize', resize);
 
-  // ── POSITION NODES ──
+  // ── POSITION NODES (Force-directed) ──
+  const SIM_W = 1200;
+  const SIM_H = 800;
+
   function positionNodes() {
     if (NODES.length === 0) return;
-    // Sort by order, separate main vs detour nodes
-    const sorted = [...NODES].sort((a, b) => (a.order || 0) - (b.order || 0));
-    const mainNodes = sorted.filter(n => n.status !== 'detour');
-    const detourNodes = sorted.filter(n => n.status === 'detour');
 
-    // Space main nodes left-to-right
-    const padX = 80;
-    const usableW = 940;
-    const stepX = mainNodes.length > 1 ? (usableW - padX * 2) / (mainNodes.length - 1) : 0;
-
-    mainNodes.forEach((n, i) => {
-      n.x = padX + i * stepX;
-      // Alternate y slightly for visual interest
-      n.y = 250 + (i % 2 === 0 ? -60 : 60);
-      n.r = n.status === 'active' ? 34 : (n.status === 'done' ? 26 : 24);
+    // Set initial positions if not yet placed
+    const children = {};
+    const hasParent = new Set();
+    EDGES.forEach(e => {
+      if (!children[e.from]) children[e.from] = [];
+      children[e.from].push(e.to);
+      hasParent.add(e.to);
     });
 
-    // Detour nodes go below their parent (find parent from edges)
-    detourNodes.forEach(d => {
-      const parentEdge = EDGES.find(e => e.to === d.id && e.type === 'detour');
-      const parent = parentEdge ? NODES.find(n => n.id === parentEdge.from) : null;
-      if (parent && parent.x !== undefined) {
-        d.x = parent.x - 60;
-        d.y = parent.y + 150;
+    // Size nodes
+    NODES.forEach(n => {
+      const isResult = n.label === 'RESULT';
+      const isInit = n.label === 'INIT';
+      const isPhase = (children[n.id] || []).length > 1;
+      n.r = isResult ? 32 : isInit ? 34 : isPhase ? 30 : (n.status === 'active' ? 28 : 22);
+    });
+
+    // Place unpositioned nodes
+    NODES.forEach((n, i) => {
+      if (n.x !== undefined && n.y !== undefined) return;
+      if (n.label === 'INIT' || n.id === '__init__') {
+        n.x = 120; n.y = SIM_H / 2;
       } else {
-        d.x = 440;
-        d.y = 400;
+        // Place near parent if possible
+        const parentEdge = EDGES.find(e => e.to === n.id);
+        const parent = parentEdge ? NODES.find(nd => nd.id === parentEdge.from) : null;
+        if (parent && parent.x !== undefined) {
+          const angle = (Math.random() - 0.5) * Math.PI * 0.8;
+          n.x = parent.x + 180 + Math.random() * 40;
+          n.y = parent.y + Math.sin(angle) * 120;
+        } else {
+          n.x = 200 + i * 100;
+          n.y = SIM_H / 2 + (Math.random() - 0.5) * 300;
+        }
       }
-      d.r = 22;
     });
+
+    // Run force simulation (few iterations for smooth incremental layout)
+    for (let iter = 0; iter < 60; iter++) {
+      // Repulsion between all nodes
+      for (let i = 0; i < NODES.length; i++) {
+        for (let j = i + 1; j < NODES.length; j++) {
+          const a = NODES[i], b = NODES[j];
+          let dx = b.x - a.x, dy = b.y - a.y;
+          let dist = Math.sqrt(dx * dx + dy * dy) || 1;
+          const minDist = (a.r + b.r) * 3.5;
+          if (dist < minDist) {
+            const force = (minDist - dist) / dist * 0.3;
+            const fx = dx * force, fy = dy * force;
+            if (a.label !== 'INIT' && a.id !== '__init__') { a.x -= fx; a.y -= fy; }
+            if (b.label !== 'INIT' && b.id !== '__init__') { b.x += fx; b.y += fy; }
+          }
+        }
+      }
+
+      // Attraction along edges (spring)
+      EDGES.forEach(e => {
+        const from = NODES.find(n => n.id === e.from);
+        const to = NODES.find(n => n.id === e.to);
+        if (!from || !to || from.x === undefined || to.x === undefined) return;
+        let dx = to.x - from.x, dy = to.y - from.y;
+        let dist = Math.sqrt(dx * dx + dy * dy) || 1;
+        const idealDist = 200;
+        const force = (dist - idealDist) / dist * 0.05;
+        const fx = dx * force, fy = dy * force;
+        if (from.label !== 'INIT' && from.id !== '__init__') { from.x += fx; from.y += fy; }
+        if (to.label !== 'INIT' && to.id !== '__init__') { to.x -= fx * 0.3; to.y -= fy * 0.3; }
+      });
+
+      // Pull children to the right of parents (directional bias)
+      EDGES.forEach(e => {
+        const from = NODES.find(n => n.id === e.from);
+        const to = NODES.find(n => n.id === e.to);
+        if (!from || !to || from.x === undefined || to.x === undefined) return;
+        if (to.x < from.x + 100) {
+          if (to.label !== 'INIT' && to.id !== '__init__') {
+            to.x += (from.x + 160 - to.x) * 0.1;
+          }
+        }
+      });
+
+      // Keep nodes in bounds
+      NODES.forEach(n => {
+        if (n.label === 'INIT' || n.id === '__init__') return;
+        n.x = Math.max(60, Math.min(SIM_W - 60, n.x));
+        n.y = Math.max(60, Math.min(SIM_H - 60, n.y));
+      });
+    }
   }
 
-  function scaleX(x) { return x * (W / 940); }
-  function scaleY(y) { return y * (H / 520); }
-  function scaleR(r) { return r * Math.min(W / 940, H / 520); }
+  function scaleX(x) { return (x * (W / SIM_W)) * zoom + panX; }
+  function scaleY(y) { return (y * (H / SIM_H)) * zoom + panY; }
+  function scaleR(r) { return r * Math.min(W / SIM_W, H / SIM_H) * zoom; }
 
   // ── PARTICLES ──
   function rebuildParticles() {
@@ -656,7 +771,9 @@ function boot(sessionId) {
   function drawNode(n) {
     if (n.x === undefined) return;
     const x = scaleX(n.x), y = scaleY(n.y), r = scaleR(n.r);
-    const pal = PALETTE[n.status] || PALETTE.pending;
+    const isResult = n.label === 'RESULT';
+    const isCache = n.label === 'CACHED';
+    const pal = isCache ? PALETTE.cache : isResult ? PALETTE.result : (PALETTE[n.status] || PALETTE.pending);
     const isActive = n.status === 'active';
     const isHovered = hoveredNode === n;
 
@@ -717,7 +834,8 @@ function boot(sessionId) {
       const labelY = y - r - 26;
       ctx.font = 'bold 11px Inter, system-ui, sans-serif';
       ctx.textAlign = 'center';
-      const hereText = '\\u26A1 AI IS HERE';
+      const sid = n._sessionId ? (' #' + n._sessionId.slice(0, 4)) : '';
+      const hereText = '\\u26A1 AI' + sid + ' HERE';
       const tw = ctx.measureText(hereText).width;
       ctx.beginPath();
       ctx.roundRect(x - tw/2 - 10, labelY - 10, tw + 20, 22, 11);
@@ -730,12 +848,14 @@ function boot(sessionId) {
     }
 
     // Label
-    ctx.font = 'bold ' + Math.max(11, r * 0.45) + 'px Inter, system-ui, sans-serif';
+    ctx.font = 'bold ' + Math.max(13, r * 0.5) + 'px Inter, system-ui, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = pal.text;
     ctx.globalAlpha = n.status === 'pending' ? 0.55 : 1;
-    const label = (n.label || n.id || '').toUpperCase();
+    const rawLabel = (n.label || n.id || '').toUpperCase();
+    const maxChars = Math.max(6, Math.floor(r / 4));
+    const label = rawLabel.length > maxChars ? rawLabel.slice(0, maxChars - 1) + '\\u2026' : rawLabel;
     ctx.fillText(label, x, y - (n.status === 'done' || isActive ? 4 : 0));
 
     // Status text
@@ -824,9 +944,11 @@ function boot(sessionId) {
 
     sorted.forEach((n, i) => {
       const isDetour = n.status === 'detour';
+      const isResult = n.label === 'RESULT';
       if (!isDetour) mainIndex++;
-      const statusClass = 'step-' + n.status;
-      const marker = n.status === 'done' ? '\\u2713' :
+      const statusClass = isResult ? 'step-result' : ('step-' + n.status);
+      const marker = isResult ? '\\u2605' :
+                     n.status === 'done' ? '\\u2713' :
                      n.status === 'active' ? mainIndex :
                      n.status === 'detour' ? '!' : mainIndex;
 
@@ -883,7 +1005,8 @@ function boot(sessionId) {
   function renderPanel(nodeId) {
     const n = NODES.find(nd => nd.id === nodeId);
     if (!n) return;
-    const pal = PALETTE[n.status] || PALETTE.pending;
+    const isResult = n.label === 'RESULT';
+    const pal = isResult ? PALETTE.result : (PALETTE[n.status] || PALETTE.pending);
     const panelEl = document.getElementById('panel-content');
     if (!panelEl) return;
 
@@ -905,31 +1028,32 @@ function boot(sessionId) {
       + '<div class="dp-subtitle">Step ' + stepText + ' \\u2014 ' + statusText + '</div>'
       + '</div></div>';
 
+    html += '<div class="dp-row">';
+
+    // Column 1: Description
+    html += '<div class="dp-col">';
     if (n.layman) {
       html += '<div class="dp-section"><div class="dp-layman">'
         + '<div class="dp-layman-title" style="color:' + pal.fill + '">In plain words</div>'
         + n.layman
         + '</div></div>';
     }
-
     if (n.cause || n.expect) {
-      html += '<div class="dp-section">'
-        + '<div class="dp-label">Why this step?</div>';
       if (n.cause) html += '<div class="dp-cause"><b>Because:</b> ' + n.cause + '</div>';
-      if (n.expect) html += '<div class="dp-expect"><b>Expected result:</b> ' + n.expect + '</div>';
-      html += '</div>';
+      if (n.expect) html += '<div class="dp-expect" style="margin-top:6px"><b>Expected:</b> ' + n.expect + '</div>';
     }
-
     if (n.techDetails) {
-      html += '<div class="dp-section">'
+      html += '<div class="dp-section" style="margin-top:8px">'
         + '<div class="dp-label">Technical details</div>'
         + '<div class="dp-value" style="font-size:12px">' + n.techDetails + '</div>'
         + '</div>';
     }
+    html += '</div>';
 
+    // Column 2: Activity log
+    html += '<div class="dp-col">';
     if (n.activity && n.activity.length > 0) {
-      html += '<div class="dp-activity">'
-        + '<div class="dp-label">Live Activity <span class="typing-indicator"><span></span><span></span><span></span></span></div>';
+      html += '<div class="dp-label">Live Activity <span class="typing-indicator"><span></span><span></span><span></span></span></div>';
       n.activity.forEach(a => {
         const isNew = a.isNew || false;
         const isBug = a.isBug || false;
@@ -940,8 +1064,12 @@ function boot(sessionId) {
           + (a.dim ? ' <span class="dp-dim">' + a.dim + '</span>' : '')
           + '</div>';
       });
-      html += '</div>';
+    } else {
+      html += '<div class="dp-label">Activity</div><div style="color:#4a5568;font-size:12px">No activity yet</div>';
     }
+    html += '</div>';
+
+    html += '</div>'; // close dp-row
 
     panelEl.innerHTML = html;
   }
@@ -960,7 +1088,8 @@ function boot(sessionId) {
       const dx = mx - nx, dy = my - ny;
       if (dx*dx + dy*dy < nr*nr) {
         hoveredNode = n;
-        const pal = PALETTE[n.status] || PALETTE.pending;
+        const isResultNode = n.label === 'RESULT';
+        const pal = isResultNode ? PALETTE.result : (PALETTE[n.status] || PALETTE.pending);
         tt.querySelector('.tt-name').textContent = (n.label || n.id);
         tt.querySelector('.tt-name').style.color = pal.text;
         tt.querySelector('.tt-desc').textContent = n.layman ? n.layman.replace(/<[^>]*>/g, '').slice(0, 120) : (n.desc || '');
@@ -974,7 +1103,7 @@ function boot(sessionId) {
       }
     }
     tt.style.display = 'none';
-    canvas.style.cursor = 'default';
+    canvas.style.cursor = 'grab';
   });
 
   canvas.addEventListener('click', function(e) {
@@ -1000,6 +1129,80 @@ function boot(sessionId) {
     hoveredNode = null;
   });
 
+  // ── ZOOM & PAN ──
+  canvas.addEventListener('wheel', function(e) {
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const oldZoom = zoom;
+    const delta = e.deltaY > 0 ? 0.9 : 1.1;
+    zoom = Math.max(0.3, Math.min(5, zoom * delta));
+    // Zoom toward cursor
+    panX = mx - (mx - panX) * (zoom / oldZoom);
+    panY = my - (my - panY) * (zoom / oldZoom);
+  }, { passive: false });
+
+  canvas.addEventListener('mousedown', function(e) {
+    if (e.button === 0) {
+      // Check if clicking on a node — if so, don't pan
+      const rect = canvas.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+      let onNode = false;
+      for (const n of NODES) {
+        if (n.x === undefined) continue;
+        const nx = scaleX(n.x), ny = scaleY(n.y), nr = scaleR(n.r);
+        const dx = mx - nx, dy = my - ny;
+        if (dx*dx + dy*dy < nr*nr) { onNode = true; break; }
+      }
+      if (!onNode) {
+        isPanning = true;
+        panStartX = e.clientX;
+        panStartY = e.clientY;
+        panStartPanX = panX;
+        panStartPanY = panY;
+        canvas.style.cursor = 'grabbing';
+        e.preventDefault();
+      }
+    }
+  });
+
+  window.addEventListener('mousemove', function(e) {
+    if (!isPanning) return;
+    panX = panStartPanX + (e.clientX - panStartX);
+    panY = panStartPanY + (e.clientY - panStartY);
+  });
+
+  window.addEventListener('mouseup', function() {
+    if (isPanning) {
+      isPanning = false;
+      canvas.style.cursor = 'grab';
+    }
+  });
+
+  document.getElementById('zoom-in').addEventListener('click', function() {
+    const cx = W / 2, cy = H / 2;
+    const oldZoom = zoom;
+    zoom = Math.min(5, zoom * 1.3);
+    panX = cx - (cx - panX) * (zoom / oldZoom);
+    panY = cy - (cy - panY) * (zoom / oldZoom);
+  });
+
+  document.getElementById('zoom-out').addEventListener('click', function() {
+    const cx = W / 2, cy = H / 2;
+    const oldZoom = zoom;
+    zoom = Math.max(0.3, zoom * 0.7);
+    panX = cx - (cx - panX) * (zoom / oldZoom);
+    panY = cy - (cy - panY) * (zoom / oldZoom);
+  });
+
+  document.getElementById('zoom-reset').addEventListener('click', function() {
+    zoom = 1;
+    panX = 0;
+    panY = 0;
+  });
+
   // ── RESIZE HANDLE ──
   const handle = document.getElementById('resize-handle');
   const layout = document.querySelector('.layout');
@@ -1013,9 +1216,9 @@ function boot(sessionId) {
 
   window.addEventListener('mousemove', function(e) {
     if (!dragging) return;
-    const newWidth = window.innerWidth - e.clientX;
-    const clamped = Math.max(240, Math.min(500, newWidth));
-    layout.style.setProperty('--panel-width', clamped + 'px');
+    const newHeight = window.innerHeight - e.clientY;
+    const clamped = Math.max(120, Math.min(400, newHeight));
+    layout.style.setProperty('--panel-height', clamped + 'px');
     resize();
   });
 
@@ -1057,18 +1260,25 @@ function boot(sessionId) {
     }
   }
 
-  fetch('/api/graph/' + sessionId)
+  const graphUrl = isAllMode ? '/api/graph' : ('/api/graph/' + sessionId);
+  fetch(graphUrl)
     .then(r => r.json())
-    .then(graph => {
-      applyGraphData(graph);
+    .then(data => {
+      applyGraphData(isAllMode ? data : data);
     })
     .catch(() => {
       // No graph yet, wait for SSE
     });
 
+  fetch('/api/sessions').then(r => r.json()).then(data => {
+    const el = document.getElementById('session-count');
+    if (el) el.textContent = (data.sessions?.length ?? 0) + ' sessions';
+  }).catch(() => {});
+
   // ── SSE ──
   function connectSSE() {
-    const es = new EventSource('/api/events?sessionId=' + sessionId);
+    const eventsUrl = isAllMode ? '/api/events' : ('/api/events?sessionId=' + sessionId);
+    const es = new EventSource(eventsUrl);
     es.onopen = function() {
       sseConnected = true;
       const badge = document.getElementById('live-badge');
@@ -1082,17 +1292,52 @@ function boot(sessionId) {
 
     es.addEventListener('graph:full', function(e) {
       try {
-        const graph = JSON.parse(e.data);
-        applyGraphData(graph);
+        const data = JSON.parse(e.data);
+        if (isAllMode) {
+          // In all-mode, graph:full is per-session — merge into existing graph
+          const g = data.graph || data;
+          if (g.nodes) {
+            let sessionInitId = null;
+            g.nodes.forEach(n => {
+              if (n.label === 'INIT') { sessionInitId = n.id; return; }
+              const existing = NODES.findIndex(nd => nd.id === n.id);
+              if (existing >= 0) NODES[existing] = { ...NODES[existing], ...n };
+              else NODES.push({ ...n, label: n.label || n.id, status: n.status || 'pending', order: n.order || 0 });
+            });
+            // Ensure central INIT exists
+            if (!NODES.find(n => n.id === '__init__')) {
+              NODES.unshift({ id: '__init__', label: 'INIT', status: 'done', order: 0, layman: 'Central hub — all sessions branch from here.', cause: '', expect: '', techDetails: null, activity: [] });
+            }
+            if (g.edges) {
+              g.edges.forEach(edge => {
+                const from = edge.from === sessionInitId ? '__init__' : edge.from;
+                const to = edge.to === sessionInitId ? '__init__' : edge.to;
+                if (!EDGES.find(ex => ex.from === from && ex.to === to)) {
+                  EDGES.push({ ...edge, from, to });
+                }
+              });
+            }
+          }
+          positionNodes();
+          rebuildParticles();
+          renderSteps();
+        } else {
+          applyGraphData(data.graph || data);
+        }
       } catch(err) {}
     });
 
     es.addEventListener('node:added', function(e) {
       try {
-        const node = JSON.parse(e.data);
+        const data = JSON.parse(e.data);
+        const node = data.node || data;
+        // In all-mode, skip per-session INIT nodes (we use central __init__)
+        if (isAllMode && node.label === 'INIT') return;
+        // Attach sessionId from SSE event data
+        const sessionTag = data.sessionId || node.sessionId || node._sessionId;
         const existing = NODES.findIndex(n => n.id === node.id);
-        if (existing >= 0) NODES[existing] = { ...NODES[existing], ...node };
-        else NODES.push({ ...node, label: node.label || node.id, status: node.status || 'pending', order: node.order || 0 });
+        if (existing >= 0) NODES[existing] = { ...NODES[existing], ...node, _sessionId: sessionTag };
+        else NODES.push({ ...node, label: node.label || node.id, status: node.status || 'pending', order: node.order || 0, _sessionId: sessionTag });
         positionNodes();
         rebuildParticles();
         renderSteps();
@@ -1102,7 +1347,8 @@ function boot(sessionId) {
 
     es.addEventListener('node:updated', function(e) {
       try {
-        const data = JSON.parse(e.data);
+        const raw = JSON.parse(e.data);
+        const data = raw.patch ? { id: raw.nodeId, ...raw.patch } : raw;
         const node = NODES.find(n => n.id === data.id);
         if (node) {
           Object.assign(node, data);
@@ -1116,8 +1362,18 @@ function boot(sessionId) {
 
     es.addEventListener('edge:added', function(e) {
       try {
-        const edge = JSON.parse(e.data);
-        EDGES.push({ ...edge, from: edge.from || edge.source, to: edge.to || edge.target });
+        const data = JSON.parse(e.data);
+        const edge = data.edge || data;
+        let from = edge.from || edge.source;
+        let to = edge.to || edge.target;
+        // In all-mode, remap edges from per-session INIT to central __init__
+        if (isAllMode) {
+          if (!NODES.find(n => n.id === from)) from = '__init__';
+          if (!NODES.find(n => n.id === to)) to = '__init__';
+        }
+        if (!EDGES.find(ex => ex.from === from && ex.to === to)) {
+          EDGES.push({ ...edge, from, to });
+        }
         rebuildParticles();
         renderSteps();
       } catch(err) {}
@@ -1125,11 +1381,12 @@ function boot(sessionId) {
 
     es.addEventListener('activity', function(e) {
       try {
-        const data = JSON.parse(e.data);
+        const raw = JSON.parse(e.data);
+        const data = { nodeId: raw.nodeId, entry: raw.entry || raw };
         const node = NODES.find(n => n.id === data.nodeId);
         if (node) {
           if (!node.activity) node.activity = [];
-          node.activity.push(data);
+          node.activity.push(data.entry);
           if (selectedNodeId === data.nodeId) renderPanel(data.nodeId);
         }
       } catch(err) {}
@@ -1140,9 +1397,10 @@ function boot(sessionId) {
         const data = JSON.parse(e.data);
         const pctEl = document.getElementById('progress-pct');
         const fillEl = document.getElementById('progress-fill');
-        if (data.percent !== undefined) {
-          if (pctEl) pctEl.textContent = data.percent + '%';
-          if (fillEl) fillEl.style.width = data.percent + '%';
+        const pct = data.progress ?? data.percent;
+        if (pct !== undefined) {
+          if (pctEl) pctEl.textContent = pct + '%';
+          if (fillEl) fillEl.style.width = pct + '%';
         }
       } catch(err) {}
     });
