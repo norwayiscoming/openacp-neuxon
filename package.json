@@ -45,6 +45,7 @@
   "devDependencies": {
     "@openacp/cli": "file:../OpenACP",
     "@types/node": "^22.0.0",
+    "@types/sql.js": "^1.4.11",
     "tsup": "^8.5.0",
     "typescript": "^5.9.0",
     "vitest": "^3.0.0"
