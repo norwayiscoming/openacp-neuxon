@@ -1,10 +1,10 @@
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
-import type { SessionGraphStore } from "./session-graph-store.js";
+import type { GraphStore } from "./graph-store.js";
 import type { SSEEvent } from "./types.js";
 import { generateDashboardHtml } from "./templates/dashboard.js";
 
-export function createNeuxonApp(store: SessionGraphStore): Hono {
+export function createNeuxonApp(store: GraphStore): Hono {
   const app = new Hono();
 
   app.get("/health", (c) => c.json({ status: "ok" }));
@@ -24,6 +24,50 @@ export function createNeuxonApp(store: SessionGraphStore): Hono {
     const graph = store.get(c.req.param("sessionId"));
     if (!graph) return c.json({ error: "not found" }, 404);
     return c.json(graph);
+  });
+
+  // Merged graph of all sessions — single INIT, each session branches out
+  app.get("/api/graph", (c) => {
+    const sessions = store.list();
+    const initNode = {
+      id: "__init__",
+      label: "INIT",
+      status: "done",
+      layman: "Central hub — all AI sessions branch from here.",
+      cause: "This is the root of your knowledge graph.",
+      expect: "Each branch represents a different task or conversation.",
+      techDetails: null,
+      activity: [],
+      startedAt: new Date().toISOString(),
+      completedAt: new Date().toISOString(),
+      order: 0,
+    };
+    const allNodes = [initNode];
+    const allEdges: any[] = [];
+
+    for (const g of sessions) {
+      // Skip the session's own INIT node, replace with edge from central INIT
+      let sessionRootId: string | null = null;
+      for (const node of g.nodes) {
+        if (node.label === "INIT") {
+          sessionRootId = node.id;
+          continue; // skip per-session INIT
+        }
+        allNodes.push({ ...node, _sessionId: g.sessionId } as any);
+      }
+      for (const edge of g.edges) {
+        if (edge.from === sessionRootId) {
+          // Rewire: central INIT → first real node
+          allEdges.push({ ...edge, from: "__init__" });
+        } else if (edge.to === sessionRootId) {
+          continue; // skip edges pointing to per-session INIT
+        } else {
+          allEdges.push(edge);
+        }
+      }
+    }
+
+    return c.json({ nodes: allNodes, edges: allEdges });
   });
 
   app.get("/", (c) => {
@@ -48,16 +92,24 @@ export class SSEManager {
   }
 
   broadcast(event: SSEEvent): void {
-    const clients = this.clients.get(event.sessionId);
-    if (!clients || clients.size === 0) return;
-
     const data = `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`;
     const encoder = new TextEncoder();
+    const encoded = encoder.encode(data);
 
-    for (const writer of clients) {
-      writer.write(encoder.encode(data)).catch(() => {
-        clients.delete(writer);
-      });
+    // Send to session-specific clients
+    const clients = this.clients.get(event.sessionId);
+    if (clients) {
+      for (const writer of clients) {
+        writer.write(encoded).catch(() => { clients.delete(writer); });
+      }
+    }
+
+    // Also send to "__all__" subscribers
+    const allClients = this.clients.get("__all__");
+    if (allClients) {
+      for (const writer of allClients) {
+        writer.write(encoded).catch(() => { allClients.delete(writer); });
+      }
     }
   }
 
@@ -67,7 +119,7 @@ export class SSEManager {
 }
 
 export function startNeuxonServer(
-  store: SessionGraphStore,
+  store: GraphStore,
   sseManager: SSEManager,
   port: number,
 ): { server: ReturnType<typeof serve>; actualPort: number } | null {
@@ -75,25 +127,33 @@ export function startNeuxonServer(
 
   app.get("/api/events", (c) => {
     const sessionId = c.req.query("sessionId");
-    if (!sessionId) {
-      return c.json({ error: "sessionId required" }, 400);
-    }
 
     const stream = new TransformStream();
     const writer = stream.writable.getWriter();
 
-    sseManager.addClient(sessionId, writer);
+    if (sessionId) {
+      // Single session mode
+      sseManager.addClient(sessionId, writer);
 
-    const graph = store.get(sessionId);
-    if (graph) {
-      const init = `event: graph:full\ndata: ${JSON.stringify({ type: "graph:full", sessionId, graph })}\n\n`;
-      writer.write(new TextEncoder().encode(init));
+      const graph = store.get(sessionId);
+      if (graph) {
+        const init = `event: graph:full\ndata: ${JSON.stringify({ type: "graph:full", sessionId, graph })}\n\n`;
+        writer.write(new TextEncoder().encode(init));
+      }
+
+      c.req.raw.signal.addEventListener("abort", () => {
+        sseManager.removeClient(sessionId, writer);
+        writer.close().catch(() => {});
+      });
+    } else {
+      // All sessions mode — subscribe to "__all__" channel
+      sseManager.addClient("__all__", writer);
+
+      c.req.raw.signal.addEventListener("abort", () => {
+        sseManager.removeClient("__all__", writer);
+        writer.close().catch(() => {});
+      });
     }
-
-    c.req.raw.signal.addEventListener("abort", () => {
-      sseManager.removeClient(sessionId, writer);
-      writer.close().catch(() => {});
-    });
 
     return new Response(stream.readable, {
       headers: {

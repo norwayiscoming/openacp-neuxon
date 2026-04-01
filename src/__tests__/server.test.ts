@@ -1,14 +1,18 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { createNeuxonApp } from "../server.js";
-import { SessionGraphStore } from "../session-graph-store.js";
+import { GraphStore } from "../graph-store.js";
 
 describe("Neuxon HTTP Server", () => {
-  let store: SessionGraphStore;
+  let store: GraphStore;
   let app: ReturnType<typeof createNeuxonApp>;
 
-  beforeEach(() => {
-    store = new SessionGraphStore();
+  beforeEach(async () => {
+    store = await GraphStore.create();
     app = createNeuxonApp(store);
+  });
+
+  afterEach(() => {
+    store?.destroy();
   });
 
   it("GET /health returns ok", async () => {

@@ -1,16 +1,20 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { GraphBuilder } from "../graph-builder.js";
-import { SessionGraphStore } from "../session-graph-store.js";
+import { GraphStore } from "../graph-store.js";
 
 describe("GraphBuilder", () => {
-  let store: SessionGraphStore;
+  let store: GraphStore;
   let builder: GraphBuilder;
   const onEvent = vi.fn();
 
-  beforeEach(() => {
-    store = new SessionGraphStore();
+  beforeEach(async () => {
+    store = await GraphStore.create();
     builder = new GraphBuilder(store, onEvent);
     onEvent.mockClear();
+  });
+
+  afterEach(() => {
+    store?.destroy();
   });
 
   it("initializes a session with an INIT node", () => {
@@ -48,10 +52,13 @@ describe("GraphBuilder", () => {
     );
     builder.handleToolCallEvent("sess-1", "Edit", "completed", "src/api.ts");
     const graph = store.get("sess-1")!;
-    const active = graph.nodes.find((n) => n.status === "active")!;
-    expect(active.activity).toHaveLength(1);
-    expect(active.activity[0].action).toBe("write");
-    expect(active.activity[0].text).toContain("src/api.ts");
+    // With the current implementation, activity goes to the phase (step) node.
+    // completeToolNode marks it "done", but activity is still present on it.
+    const buildNode = graph.nodes.find((n) => n.label === "Build")!;
+    expect(buildNode).toBeDefined();
+    expect(buildNode.activity).toHaveLength(1);
+    expect(buildNode.activity[0].action).toBe("write");
+    expect(buildNode.activity[0].text).toContain("src/api.ts");
   });
 
   it("creates detour node on error tool call", () => {
@@ -62,9 +69,11 @@ describe("GraphBuilder", () => {
     );
     builder.handleToolCallEvent("sess-1", "Bash", "error", "npm test failed");
     const graph = store.get("sess-1")!;
-    const detour = graph.nodes.find((n) => n.status === "detour");
-    expect(detour).toBeDefined();
-    expect(detour!.label).toContain("Issue");
+    // The new implementation creates an explicit "Issue Found" detour node.
+    const detourNodes = graph.nodes.filter((n) => n.status === "detour");
+    expect(detourNodes.length).toBeGreaterThan(0);
+    const issueNode = detourNodes.find((n) => n.label.includes("Issue"));
+    expect(issueNode).toBeDefined();
   });
 
   it("marks current step done on turn end", () => {

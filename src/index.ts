@@ -1,27 +1,33 @@
 import { z } from "zod";
 import type { OpenACPPlugin, PluginContext } from "@openacp/cli";
-import { SessionGraphStore } from "./session-graph-store.js";
+import { GraphStore } from "./graph-store.js";
 import { GraphBuilder } from "./graph-builder.js";
 import { startNeuxonServer, SSEManager } from "./server.js";
 import { createNeuxonCommand } from "./neuxon-command.js";
 
-let store: SessionGraphStore | null = null;
+let store: GraphStore | null = null;
 let builder: GraphBuilder | null = null;
 let sseManager: SSEManager | null = null;
 let serverHandle: { server: ReturnType<typeof import("@hono/node-server").serve>; actualPort: number } | null = null;
+const textBuffers = new Map<string, string>();
+const flushTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const fullResponses = new Map<string, string>();
 
 const STEP_INJECTION_PROMPT = `[System — Neuxon Progress Tracker]
 
-When you start a new phase of work, declare it with a [STEP] block:
+Declare each distinct phase of your work with a [STEP] block:
 
 [STEP name="<short name>" why="<why this step, in simple terms>" expect="<what the user will get when done>"]
 
 Rules:
-- Write "name" as a short action (e.g., "Analyze Code", "Build Login", "Fix Bug")
+- Declare a [STEP] for EVERY distinct phase: planning, researching, analyzing, searching, reading, writing, testing, summarizing, etc.
+- Write "name" as a short action (e.g., "Plan Approach", "Search Sources", "Analyze Results", "Write Summary", "Review Code")
 - Write "why" explaining the reason a non-technical person would understand
 - Write "expect" describing the visible result in plain terms
-- Only declare a step when starting genuinely new work, not for every small action
-- You can declare steps mid-response — just include the [STEP] block in your output`;
+- Declare 3-8 steps per task — break work into meaningful phases
+- Declare a new [STEP] BEFORE each phase starts, not after
+- You can declare steps mid-response — just include the [STEP] block in your output
+- Example flow: [STEP name="Understand Request"...] → [STEP name="Research"...] → [STEP name="Analyze Findings"...] → [STEP name="Write Answer"...]`;
 
 const settingsSchema = z.object({
   port: z.number().int().min(1024).max(65535).default(3200),
@@ -51,7 +57,7 @@ function createNeuxonPlugin(): OpenACPPlugin {
       const autoInject = config.autoInjectPrompt ?? true;
 
       // Initialize core components
-      store = new SessionGraphStore();
+      store = await GraphStore.create();
       sseManager = new SSEManager();
       builder = new GraphBuilder(store, (event) => {
         sseManager?.broadcast(event);
@@ -84,32 +90,40 @@ function createNeuxonPlugin(): OpenACPPlugin {
           event: { type: string; content?: string; name?: string; status?: string };
         };
 
-        // DEBUG: log raw event shape
-        ctx.log.info(`[neuxon debug] agent:event received — keys: ${JSON.stringify(args[0] ? Object.keys(args[0] as object) : 'null')}`);
-        if (payload?.event) {
-          ctx.log.info(`[neuxon debug] event.type=${payload.event.type} name=${payload.event.name ?? '-'} status=${payload.event.status ?? '-'} contentLen=${payload.event.content?.length ?? 0}`);
-        }
-
-        if (!payload?.sessionId || !payload?.event) {
-          ctx.log.info(`[neuxon debug] skipping — no sessionId or event`);
-          return;
-        }
+        if (!payload?.sessionId || !payload?.event) return;
 
         const { sessionId, event } = payload;
 
         // Initialize graph on first event if needed
         if (!store!.get(sessionId)) {
-          ctx.log.info(`[neuxon debug] initializing graph for session ${sessionId}`);
           builder!.initSession(sessionId, "agent");
         }
 
         if (event.type === "text" && event.content) {
-          ctx.log.info(`[neuxon debug] handling text event, length=${event.content.length}, hasSTEP=${event.content.includes('[STEP')}`);
-          builder!.handleTextEvent(sessionId, event.content);
+          // Accumulate full response for RESULT node
+          const fullPrev = fullResponses.get(sessionId) ?? "";
+          fullResponses.set(sessionId, fullPrev + event.content);
+
+          // Buffer streaming text chunks, flush after 500ms idle
+          const prev = textBuffers.get(sessionId) ?? "";
+          textBuffers.set(sessionId, prev + event.content);
+
+          const existing = flushTimers.get(sessionId);
+          if (existing) clearTimeout(existing);
+
+          flushTimers.set(sessionId, setTimeout(() => {
+            const buffered = textBuffers.get(sessionId);
+            if (buffered) {
+              ctx.log.info(`[neuxon] flushing text buffer, length=${buffered.length}, hasSTEP=${buffered.includes('[STEP')}`);
+              builder!.handleTextEvent(sessionId, buffered);
+              textBuffers.delete(sessionId);
+            }
+            flushTimers.delete(sessionId);
+          }, 500));
         }
 
-        if (event.type === "tool_call" && event.name) {
-          ctx.log.info(`[neuxon debug] handling tool_call: ${event.name} status=${event.status}`);
+        if ((event.type === "tool_call" || event.type === "tool_update") && event.name && event.name !== "undefined") {
+          ctx.log.info(`[neuxon] tool event: ${event.name} status=${event.status}`);
           builder!.handleToolCallEvent(
             sessionId,
             event.name,
@@ -145,7 +159,18 @@ function createNeuxonPlugin(): OpenACPPlugin {
         priority: 100,
         handler: async (payload, next) => {
           if (payload.sessionId) {
-            builder!.handleTurnEnd(payload.sessionId);
+            // Flush any remaining text buffer
+            const timer = flushTimers.get(payload.sessionId);
+            if (timer) clearTimeout(timer);
+            const buffered = textBuffers.get(payload.sessionId);
+            if (buffered) {
+              builder!.handleTextEvent(payload.sessionId, buffered);
+              textBuffers.delete(payload.sessionId);
+              flushTimers.delete(payload.sessionId);
+            }
+            const fullResponse = fullResponses.get(payload.sessionId) ?? "";
+            builder!.handleTurnEnd(payload.sessionId, fullResponse);
+            fullResponses.delete(payload.sessionId);
           }
           return next();
         },

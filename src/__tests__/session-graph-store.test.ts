@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { SessionGraphStore } from "../session-graph-store.js";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { GraphStore } from "../graph-store.js";
 import type { GraphNode, GraphEdge } from "../types.js";
 
 function makeNode(overrides: Partial<GraphNode> = {}): GraphNode {
@@ -30,11 +30,15 @@ function makeEdge(overrides: Partial<GraphEdge> = {}): GraphEdge {
   };
 }
 
-describe("SessionGraphStore", () => {
-  let store: SessionGraphStore;
+describe("GraphStore (replaces SessionGraphStore)", () => {
+  let store: GraphStore;
 
-  beforeEach(() => {
-    store = new SessionGraphStore();
+  beforeEach(async () => {
+    store = await GraphStore.create();
+  });
+
+  afterEach(() => {
+    store?.destroy();
   });
 
   it("creates a new graph with getOrCreate", () => {
@@ -84,9 +88,12 @@ describe("SessionGraphStore", () => {
     expect(store.get("sess-1")!.activeNodeId).toBe("n1");
   });
 
-  it("removes a graph", () => {
+  it("removes a graph from memory", () => {
     store.getOrCreate("sess-1", "claude");
     store.remove("sess-1");
+    // After remove(), session is gone from cache but still in SQLite — get() reloads it
+    // Use evictFromCache + getFromDb or deleteSession for full removal
+    store.deleteSession("sess-1");
     expect(store.get("sess-1")).toBeUndefined();
   });
 

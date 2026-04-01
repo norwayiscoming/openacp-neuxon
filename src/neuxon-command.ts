@@ -1,4 +1,4 @@
-import type { SessionGraphStore } from "./session-graph-store.js";
+import type { GraphStore } from "./graph-store.js";
 
 export interface NeuxonCommandDef {
   name: string;
@@ -14,7 +14,7 @@ export interface NeuxonCommandDef {
 }
 
 export function createNeuxonCommand(
-  store: SessionGraphStore,
+  store: GraphStore,
   getUrl: () => string,
 ): NeuxonCommandDef {
   return {
@@ -24,7 +24,7 @@ export function createNeuxonCommand(
     category: "plugin",
 
     async handler(args) {
-      const subcommand = args.text.trim().toLowerCase();
+      const subcommand = (args.text ?? "").trim().toLowerCase();
       const baseUrl = getUrl();
 
       if (subcommand === "sessions") {
