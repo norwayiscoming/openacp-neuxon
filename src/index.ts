@@ -83,20 +83,33 @@ function createNeuxonPlugin(): OpenACPPlugin {
           sessionId: string;
           event: { type: string; content?: string; name?: string; status?: string };
         };
-        if (!payload?.sessionId || !payload?.event) return;
+
+        // DEBUG: log raw event shape
+        ctx.log.info(`[neuxon debug] agent:event received — keys: ${JSON.stringify(args[0] ? Object.keys(args[0] as object) : 'null')}`);
+        if (payload?.event) {
+          ctx.log.info(`[neuxon debug] event.type=${payload.event.type} name=${payload.event.name ?? '-'} status=${payload.event.status ?? '-'} contentLen=${payload.event.content?.length ?? 0}`);
+        }
+
+        if (!payload?.sessionId || !payload?.event) {
+          ctx.log.info(`[neuxon debug] skipping — no sessionId or event`);
+          return;
+        }
 
         const { sessionId, event } = payload;
 
         // Initialize graph on first event if needed
         if (!store!.get(sessionId)) {
+          ctx.log.info(`[neuxon debug] initializing graph for session ${sessionId}`);
           builder!.initSession(sessionId, "agent");
         }
 
         if (event.type === "text" && event.content) {
+          ctx.log.info(`[neuxon debug] handling text event, length=${event.content.length}, hasSTEP=${event.content.includes('[STEP')}`);
           builder!.handleTextEvent(sessionId, event.content);
         }
 
         if (event.type === "tool_call" && event.name) {
+          ctx.log.info(`[neuxon debug] handling tool_call: ${event.name} status=${event.status}`);
           builder!.handleToolCallEvent(
             sessionId,
             event.name,
