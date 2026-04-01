@@ -1,4 +1,5 @@
 import type { GraphStore } from "./graph-store.js";
+import type { KnowledgeIndex } from "./knowledge-index.js";
 
 export interface NeuxonCommandDef {
   name: string;
@@ -16,6 +17,7 @@ export interface NeuxonCommandDef {
 export function createNeuxonCommand(
   store: GraphStore,
   getUrl: () => string,
+  _knowledgeIndex?: KnowledgeIndex,
 ): NeuxonCommandDef {
   return {
     name: "neuxon",

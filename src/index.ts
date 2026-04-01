@@ -4,6 +4,10 @@ import { GraphStore } from "./graph-store.js";
 import { GraphBuilder } from "./graph-builder.js";
 import { startNeuxonServer, SSEManager } from "./server.js";
 import { createNeuxonCommand } from "./neuxon-command.js";
+import { KnowledgeIndex } from "./knowledge-index.js";
+import { ContextEngine } from "./context-engine.js";
+import { StepDetector } from "./step-detector.js";
+import path from "node:path";
 
 let store: GraphStore | null = null;
 let builder: GraphBuilder | null = null;
@@ -27,12 +31,20 @@ Rules:
 - Declare 3-8 steps per task — break work into meaningful phases
 - Declare a new [STEP] BEFORE each phase starts, not after
 - You can declare steps mid-response — just include the [STEP] block in your output
-- Example flow: [STEP name="Understand Request"...] → [STEP name="Research"...] → [STEP name="Analyze Findings"...] → [STEP name="Write Answer"...]`;
+- Example flow: [STEP name="Understand Request"...] → [STEP name="Research"...] → [STEP name="Analyze Findings"...] → [STEP name="Write Answer"...]
+
+Also classify your overall task type:
+[TASK type="qa"] — for factual lookups, searches, questions with definitive answers
+[TASK type="creative"] — for brainstorming, design, writing, planning, coding`;
 
 const settingsSchema = z.object({
   port: z.number().int().min(1024).max(65535).default(3200),
   autoInjectPrompt: z.boolean().default(true),
   maxNodesPerSession: z.number().int().min(5).max(200).default(50),
+  persistence: z.boolean().default(true),
+  cacheHitThreshold: z.number().min(0).max(1).default(0.85),
+  injectThreshold: z.number().min(0).max(1).default(0.5),
+  embeddingModel: z.string().default("Xenova/all-MiniLM-L6-v2"),
 });
 
 function createNeuxonPlugin(): OpenACPPlugin {
@@ -58,6 +70,20 @@ function createNeuxonPlugin(): OpenACPPlugin {
 
       // Initialize core components
       store = await GraphStore.create();
+
+      // Initialize knowledge index
+      const knowledgeIndex = new KnowledgeIndex(store.getDb());
+      const embeddingModel = config.embeddingModel ?? "Xenova/all-MiniLM-L6-v2";
+      knowledgeIndex.initEmbedding(embeddingModel).catch((err: unknown) => {
+        ctx.log.warn(`[neuxon] Embedding model failed to load: ${err}`);
+      });
+
+      // Initialize context engine
+      const contextEngine = new ContextEngine(
+        config.cacheHitThreshold ?? 0.85,
+        config.injectThreshold ?? 0.5,
+      );
+
       sseManager = new SSEManager();
       builder = new GraphBuilder(store, (event) => {
         sseManager?.broadcast(event);
@@ -80,7 +106,7 @@ function createNeuxonPlugin(): OpenACPPlugin {
 
       // Register command
       ctx.registerCommand(
-        createNeuxonCommand(store, getUrl) as any,
+        createNeuxonCommand(store, getUrl, knowledgeIndex) as any,
       );
 
       // Listen to agent events
@@ -143,6 +169,31 @@ function createNeuxonPlugin(): OpenACPPlugin {
         );
       });
 
+      // Context engine middleware — cache hit or inject prior context
+      ctx.registerMiddleware("agent:beforePrompt", {
+        priority: 40,
+        handler: async (payload, next) => {
+          if (!payload.sessionId || !payload.text) return next();
+
+          const results = await knowledgeIndex.search(payload.text, 3);
+          const decision = contextEngine.decide(results);
+
+          if (decision.action === "cache-hit" && decision.result) {
+            ctx.log.info(`[neuxon] Cache hit for session ${payload.sessionId}`);
+            (payload as any).response = contextEngine.formatCacheHitResponse(decision.result);
+            (payload as any).skipAI = true;
+            return next();
+          }
+
+          if (decision.action === "inject" && decision.injectText) {
+            ctx.log.info(`[neuxon] Injecting prior context for session ${payload.sessionId}`);
+            payload.text = `${decision.injectText}\n\n---\n\n${payload.text}`;
+          }
+
+          return next();
+        },
+      });
+
       // Inject step tracking prompt
       if (autoInject) {
         ctx.registerMiddleware("agent:beforePrompt", {
@@ -171,6 +222,42 @@ function createNeuxonPlugin(): OpenACPPlugin {
             const fullResponse = fullResponses.get(payload.sessionId) ?? "";
             builder!.handleTurnEnd(payload.sessionId, fullResponse);
             fullResponses.delete(payload.sessionId);
+
+            // Index the RESULT node for future search
+            const graph = store!.get(payload.sessionId);
+            if (graph) {
+              const resultNode = [...graph.nodes].reverse().find((n) => n.label === "RESULT" && n.fullAnswer);
+              if (resultNode) {
+                const taskBlock = StepDetector.parseTaskBlock(fullResponse);
+                if (taskBlock) {
+                  resultNode.taskType = taskBlock.type;
+                }
+
+                const stepLabels = graph.nodes
+                  .filter((n) => n.label !== "INIT" && n.label !== "RESULT")
+                  .map((n) => n.label);
+                resultNode.tags = KnowledgeIndex.extractTags(
+                  resultNode.fullAnswer ?? "",
+                  stepLabels,
+                );
+
+                // Persist tags + taskType immediately
+                store!.updateNode(payload.sessionId, resultNode.id, {
+                  taskType: resultNode.taskType,
+                  tags: resultNode.tags,
+                });
+
+                // Generate embedding async (don't block turn end)
+                knowledgeIndex.embed(resultNode.fullAnswer ?? "").then((emb) => {
+                  if (emb) {
+                    resultNode.embedding = emb;
+                    store!.updateNode(payload.sessionId, resultNode.id, {
+                      embedding: emb,
+                    });
+                  }
+                });
+              }
+            }
           }
           return next();
         },
