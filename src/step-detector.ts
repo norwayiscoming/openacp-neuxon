@@ -1,13 +1,21 @@
-import type { StepBlock } from "./types.js";
+import type { StepBlock, TaskBlock } from "./types.js";
 
 const STEP_REGEX =
   /\[STEP\s+name="([^"]+)"\s+why="([^"]+)"\s+expect="([^"]+)"\s*\]/g;
+
+const TASK_REGEX = /\[TASK\s+type="(qa|creative)"\s*\]/;
 
 const READ_TOOLS = new Set(["Read", "Grep", "Glob", "Search", "Agent"]);
 const WRITE_TOOLS = new Set(["Edit", "Write", "NotebookEdit"]);
 const EXEC_TOOLS = new Set(["Bash"]);
 
 export class StepDetector {
+  static parseTaskBlock(text: string): TaskBlock | null {
+    const match = TASK_REGEX.exec(text);
+    if (!match) return null;
+    return { type: match[1] as "qa" | "creative" };
+  }
+
   static parseStepBlock(text: string): StepBlock | null {
     const match = new RegExp(STEP_REGEX.source).exec(text);
     if (!match) return null;

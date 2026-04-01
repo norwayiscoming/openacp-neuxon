@@ -2,6 +2,29 @@ import { describe, it, expect } from "vitest";
 import { StepDetector } from "../step-detector.js";
 
 describe("StepDetector", () => {
+  describe("parseTaskBlock", () => {
+    it('parses [TASK type="qa"]', () => {
+      const result = StepDetector.parseTaskBlock('[TASK type="qa"]');
+      expect(result).toEqual({ type: "qa" });
+    });
+
+    it('parses [TASK type="creative"]', () => {
+      const result = StepDetector.parseTaskBlock('[TASK type="creative"]');
+      expect(result).toEqual({ type: "creative" });
+    });
+
+    it("returns null for no match", () => {
+      const result = StepDetector.parseTaskBlock("no task block here");
+      expect(result).toBeNull();
+    });
+
+    it("finds task block in larger text", () => {
+      const text = 'Some text\n[TASK type="qa"]\nMore text';
+      const result = StepDetector.parseTaskBlock(text);
+      expect(result).toEqual({ type: "qa" });
+    });
+  });
+
   describe("parseStepBlock", () => {
     it("parses a valid [STEP] block", () => {
       const text = `Some text before
