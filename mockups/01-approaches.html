@@ -1,0 +1,116 @@
+<h2>3 Approaches: AI Progress Graph Plugin</h2>
+<p class="subtitle">Choose the visualization approach that fits best</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>🗺️ Journey Map — "Con đường của AI"</h3>
+      <p><strong>Metaphor:</strong> A road/path from start to finish</p>
+      <p>Graph flows <strong>left → right</strong> like a journey. Big milestone nodes on the main road. Side branches for detours (debugging, retrying). New nodes grow organically as AI discovers them.</p>
+      <div class="pros-cons">
+        <div class="pros">
+          <h4>Pros</h4>
+          <ul>
+            <li>Very intuitive for non-tech — everyone understands a journey</li>
+            <li>Natural sense of progress (left = past, right = future)</li>
+            <li>Easy to show "how far along"</li>
+            <li>Detours/retries feel natural as side roads</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h4>Cons</h4>
+          <ul>
+            <li>Can get wide/long for complex tasks</li>
+            <li>Hard to show parallel work</li>
+            <li>Less "techy" — may feel too simple for PMs</li>
+          </ul>
+        </div>
+      </div>
+      <div style="margin-top:12px; padding:16px; background:#1a1a2e; border-radius:8px; font-family:monospace; font-size:13px; color:#ccc;">
+        <span style="color:#4ade80">● Analyze</span> ──→ <span style="color:#4ade80">● Design</span> ──→ <span style="color:#facc15; text-shadow:0 0 8px #facc15">◉ Build API</span> ──→ <span style="color:#555">○ Test</span> ──→ <span style="color:#555">○ Done</span><br>
+        <span style="color:transparent">● Analyze ──→ ● Design ──</span>↘<br>
+        <span style="color:transparent">● Analyze ──→ ● Design ──→</span> <span style="color:#f87171">● Fix bug</span> ↗
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>🧠 Mind Map — "Bản đồ tư duy của AI"</h3>
+      <p><strong>Metaphor:</strong> A brain thinking out loud</p>
+      <p>Central node = the task. Branches radiate outward for each phase. Sub-branches for discoveries, decisions, problems. Nodes pulse when active. Feels like watching an AI <strong>think</strong>.</p>
+      <div class="pros-cons">
+        <div class="pros">
+          <h4>Pros</h4>
+          <ul>
+            <li>Great for showing "why" — reasoning is visible</li>
+            <li>Handles complexity well — branches can go deep</li>
+            <li>Feels magical — watching a mind work</li>
+            <li>Good for both progress AND reasoning</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h4>Cons</h4>
+          <ul>
+            <li>Can get messy/cluttered</li>
+            <li>Harder to see linear progress ("how far?")</li>
+            <li>Non-tech users may find it overwhelming</li>
+          </ul>
+        </div>
+      </div>
+      <div style="margin-top:12px; padding:16px; background:#1a1a2e; border-radius:8px; font-family:monospace; font-size:13px; color:#ccc; text-align:center;">
+        <span style="color:#4ade80">Analyze ●</span>──┐<br>
+        <span style="color:#f87171">Fix bug ●</span>──┤<br>
+        <span style="color:transparent">Fix bug </span><span style="color:transparent">●</span><span style="color:transparent">──</span>├── <span style="color:#facc15; text-shadow:0 0 8px #facc15">◉ Build Website</span> ──┤<br>
+        <span style="color:#555">Test ○</span>──┘<span style="color:transparent">──├── ◉ Build Websi</span>├──<span style="color:#555">○ Done</span><br>
+        <span style="color:#818cf8">Design ●</span>──┘
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>🎮 Quest Board — "Bảng nhiệm vụ RPG"</h3>
+      <p><strong>Metaphor:</strong> A game quest/mission board</p>
+      <p>Task = a quest with stages. Each stage is a "level" node. AI moves through them like a character in a game. Side quests for unexpected work. <strong>Progress bar + graph hybrid.</strong></p>
+      <div class="pros-cons">
+        <div class="pros">
+          <h4>Pros</h4>
+          <ul>
+            <li>Gamification — fun and engaging for everyone</li>
+            <li>Clear progress (stage 3/5)</li>
+            <li>Side quests = perfect metaphor for detours</li>
+            <li>Works great for both PM and grandma</li>
+            <li>"Quest completed!" feels satisfying</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h4>Cons</h4>
+          <ul>
+            <li>May feel "unserious" for enterprise users</li>
+            <li>Harder to show deep reasoning</li>
+            <li>Game metaphor may not fit all contexts</li>
+          </ul>
+        </div>
+      </div>
+      <div style="margin-top:12px; padding:16px; background:#1a1a2e; border-radius:8px; font-family:monospace; font-size:13px; color:#ccc;">
+        <span style="color:#4ade80">✅ Stage 1: Analyze</span><br>
+        <span style="color:#4ade80">✅ Stage 2: Design</span><br>
+        <span style="color:#facc15; text-shadow:0 0 8px #facc15">⚔️ Stage 3: Build API</span> <span style="color:#818cf8">← you are here</span><br>
+        <span style="color:#555; margin-left:20px">  ⚡ Side quest: Fix auth bug</span><br>
+        <span style="color:#555">○ Stage 4: Test</span><br>
+        <span style="color:#555">○ Stage 5: Deploy</span><br>
+        <span style="color:#555; font-size:11px; margin-top:8px; display:block">━━━━━━━━━━━━━━━━━━━━ 47% ━━━━━━━━━━━━━━━━━━━━</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:24px; padding:16px; border:1px solid #333; border-radius:8px;">
+  <h3>💡 Recommendation: A + C Hybrid</h3>
+  <p>Use the <strong>Journey Map (A)</strong> as the core graph layout — nodes flowing left to right showing the path. But borrow the <strong>Quest Board (C)</strong> gamification elements — progress percentage, stage labels, "side quest" naming for detours, satisfying completion animations.</p>
+  <p>This gives you: <strong>intuitive flow</strong> (journey) + <strong>clear progress</strong> (quest) + <strong>living graph</strong> (nodes grow/branch) + <strong>fun for non-tech</strong> (game elements).</p>
+</div>

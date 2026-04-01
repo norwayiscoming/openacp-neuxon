@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a0a;
+    color: #00ff41;
+    font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+    overflow: hidden;
+  }
+
+  /* Scanline effect */
+  body::after {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0, 255, 65, 0.015) 2px,
+      rgba(0, 255, 65, 0.015) 4px
+    );
+    pointer-events: none;
+    z-index: 1000;
+  }
+
+  /* CRT glow */
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.4) 100%);
+    pointer-events: none;
+    z-index: 999;
+  }
+
+  .container {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Top bar */
+  .top-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 16px;
+    background: #0d0d0d;
+    border-bottom: 1px solid #00ff4130;
+    font-size: 11px;
+    letter-spacing: 1px;
+  }
+  .top-bar .logo {
+    font-size: 14px;
+    font-weight: bold;
+    text-shadow: 0 0 10px #00ff41, 0 0 20px #00ff4180;
+  }
+  .top-bar .status {
+    display: flex;
+    gap: 16px;
+    color: #00ff4199;
+  }
+  .top-bar .live-dot {
+    display: inline-block;
+    width: 6px; height: 6px;
+    background: #00ff41;
+    border-radius: 50%;
+    box-shadow: 0 0 6px #00ff41;
+    animation: pulse-dot 1.5s infinite;
+    margin-right: 4px;
+    vertical-align: middle;
+  }
+
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; box-shadow: 0 0 6px #00ff41; }
+    50% { opacity: 0.4; box-shadow: 0 0 2px #00ff41; }
+  }
+
+  /* Main graph area */
+  .graph-area {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Grid background */
+  .graph-area::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-image:
+      linear-gradient(rgba(0,255,65,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,255,65,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  /* Floating particles */
+  .particle {
+    position: absolute;
+    width: 2px; height: 2px;
+    background: #00ff41;
+    border-radius: 50%;
+    opacity: 0;
+    animation: float-particle linear infinite;
+  }
+  @keyframes float-particle {
+    0% { opacity: 0; transform: translateY(0); }
+    10% { opacity: 0.6; }
+    90% { opacity: 0.6; }
+    100% { opacity: 0; transform: translateY(-400px); }
+  }
+
+  /* Bottom info bar */
+  .bottom-bar {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 16px;
+    background: #0d0d0d;
+    border-top: 1px solid #00ff4130;
+    font-size: 10px;
+    color: #00ff4160;
+    letter-spacing: 0.5px;
+  }
+
+  /* Progress bar */
+  .progress-container {
+    padding: 4px 16px;
+    background: #0d0d0d;
+  }
+  .progress-track {
+    height: 3px;
+    background: #00ff4115;
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    width: 47%;
+    background: linear-gradient(90deg, #00ff41, #00ff4180);
+    box-shadow: 0 0 8px #00ff41;
+    border-radius: 2px;
+    animation: progress-glow 2s infinite;
+  }
+  @keyframes progress-glow {
+    0%, 100% { box-shadow: 0 0 8px #00ff41; }
+    50% { box-shadow: 0 0 15px #00ff41, 0 0 25px #00ff4140; }
+  }
+
+  /* Log feed */
+  .log-feed {
+    position: absolute;
+    bottom: 8px;
+    left: 16px;
+    font-size: 10px;
+    color: #00ff4140;
+    line-height: 1.6;
+  }
+  .log-feed .log-new {
+    color: #00ff4180;
+    animation: log-appear 0.5s ease-out;
+  }
+  @keyframes log-appear {
+    from { opacity: 0; transform: translateX(-10px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+</style>
+</head>
+<body>
+  <div class="container">
+    <!-- Top Bar -->
+    <div class="top-bar">
+      <div class="logo">NEUROGRAPH</div>
+      <div class="status">
+        <span><span class="live-dot"></span> LIVE TRACE</span>
+        <span>SESSION #a7f2</span>
+        <span>AGENT: claude-code</span>
+        <span>47% MAPPED</span>
+      </div>
+    </div>
+
+    <div class="progress-container">
+      <div class="progress-track"><div class="progress-fill"></div></div>
+    </div>
+
+    <!-- Graph -->
+    <div class="graph-area">
+      <!-- Particles -->
+      <div class="particle" style="left:10%; animation-duration:8s; animation-delay:0s;"></div>
+      <div class="particle" style="left:25%; animation-duration:6s; animation-delay:1s;"></div>
+      <div class="particle" style="left:40%; animation-duration:9s; animation-delay:0.5s;"></div>
+      <div class="particle" style="left:55%; animation-duration:7s; animation-delay:2s;"></div>
+      <div class="particle" style="left:70%; animation-duration:8s; animation-delay:1.5s;"></div>
+      <div class="particle" style="left:85%; animation-duration:6s; animation-delay:0.8s;"></div>
+      <div class="particle" style="left:15%; animation-duration:10s; animation-delay:3s;"></div>
+      <div class="particle" style="left:60%; animation-duration:7s; animation-delay:2.5s;"></div>
+
+      <svg width="100%" height="100%" viewBox="0 0 900 520" style="position:absolute; top:0; left:0;">
+        <defs>
+          <!-- Glow filter -->
+          <filter id="glow-green">
+            <feGaussianBlur stdDeviation="3" result="blur"/>
+            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+          <filter id="glow-yellow">
+            <feGaussianBlur stdDeviation="4" result="blur"/>
+            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+          <filter id="glow-red">
+            <feGaussianBlur stdDeviation="3" result="blur"/>
+            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+          <filter id="glow-cyan">
+            <feGaussianBlur stdDeviation="2" result="blur"/>
+            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+
+          <!-- Arrow markers -->
+          <marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#00ff41"/>
+          </marker>
+          <marker id="arrow-dim" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#00ff4130"/>
+          </marker>
+          <marker id="arrow-yellow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#facc15"/>
+          </marker>
+          <marker id="arrow-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#ff3333"/>
+          </marker>
+          <marker id="arrow-cyan" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#22d3ee"/>
+          </marker>
+
+          <!-- Data flow animation -->
+          <pattern id="flow-green" width="20" height="1" patternUnits="userSpaceOnUse">
+            <rect width="10" height="1" fill="#00ff41"/>
+            <rect x="10" width="10" height="1" fill="transparent"/>
+          </pattern>
+        </defs>
+
+        <!-- ═══════ EDGES ═══════ -->
+
+        <!-- INIT → ANALYZE (completed, solid green) -->
+        <line x1="100" y1="260" x2="228" y2="160" stroke="#00ff41" stroke-width="1.5" filter="url(#glow-green)" marker-end="url(#arrow-green)"/>
+        <!-- Data flow animation on edge -->
+        <line x1="100" y1="260" x2="228" y2="160" stroke="#00ff41" stroke-width="3" opacity="0.15">
+          <animate attributeName="stroke-dashoffset" from="40" to="0" dur="1.5s" repeatCount="indefinite"/>
+        </line>
+        <text x="145" y="198" fill="#00ff4180" font-family="'JetBrains Mono', monospace" font-size="8" transform="rotate(-30, 145, 198)">initializing</text>
+
+        <!-- ANALYZE → DESIGN (completed) -->
+        <line x1="288" y1="145" x2="388" y2="195" stroke="#00ff41" stroke-width="1.5" filter="url(#glow-green)" marker-end="url(#arrow-green)"/>
+        <text x="325" y="160" fill="#00ff4180" font-family="'JetBrains Mono', monospace" font-size="8" transform="rotate(15, 325, 160)">leads_to</text>
+
+        <!-- DESIGN → BUILD (active, yellow) -->
+        <line x1="445" y1="210" x2="520" y2="280" stroke="#facc15" stroke-width="2" filter="url(#glow-yellow)" marker-end="url(#arrow-yellow)"/>
+        <!-- Animated dash on active edge -->
+        <line x1="445" y1="210" x2="520" y2="280" stroke="#facc15" stroke-width="2" stroke-dasharray="8,6" opacity="0.5">
+          <animate attributeName="stroke-dashoffset" from="28" to="0" dur="0.8s" repeatCount="indefinite"/>
+        </line>
+        <text x="465" y="238" fill="#facc1599" font-family="'JetBrains Mono', monospace" font-size="8" transform="rotate(35, 465, 238)">decided</text>
+
+        <!-- BUILD → BUG (red, detour) -->
+        <path d="M 540 330 Q 520 380 470 410" stroke="#ff3333" stroke-width="1.5" fill="none" stroke-dasharray="6,4" filter="url(#glow-red)" marker-end="url(#arrow-red)"/>
+        <text x="510" y="375" fill="#ff333399" font-family="'JetBrains Mono', monospace" font-size="8">discovered!</text>
+
+        <!-- BUG → BUILD (cyan, resolved) -->
+        <path d="M 425 400 C 360 380, 380 330, 510 290" stroke="#22d3ee" stroke-width="1" fill="none" stroke-dasharray="4,4" filter="url(#glow-cyan)" marker-end="url(#arrow-cyan)"/>
+        <text x="390" y="360" fill="#22d3ee80" font-family="'JetBrains Mono', monospace" font-size="8">patched →</text>
+
+        <!-- BUILD → TEST (future, dim) -->
+        <line x1="585" y1="290" x2="680" y2="200" stroke="#00ff4120" stroke-width="1" stroke-dasharray="6,6" marker-end="url(#arrow-dim)"/>
+        <text x="625" y="238" fill="#00ff4125" font-family="'JetBrains Mono', monospace" font-size="8" transform="rotate(-30, 625, 238)">next</text>
+
+        <!-- TEST → DEPLOY (future, dim) -->
+        <line x1="735" y1="190" x2="800" y2="270" stroke="#00ff4120" stroke-width="1" stroke-dasharray="6,6" marker-end="url(#arrow-dim)"/>
+        <text x="760" y="235" fill="#00ff4125" font-family="'JetBrains Mono', monospace" font-size="8">deploy</text>
+
+
+        <!-- ═══════ NODES ═══════ -->
+
+        <!-- INIT Node -->
+        <g filter="url(#glow-green)">
+          <circle cx="85" cy="260" r="22" fill="#0a0a0a" stroke="#00ff41" stroke-width="1.5"/>
+          <text x="85" y="256" text-anchor="middle" fill="#00ff41" font-family="'JetBrains Mono', monospace" font-size="8" font-weight="bold">INIT</text>
+          <text x="85" y="267" text-anchor="middle" fill="#00ff4160" font-family="'JetBrains Mono', monospace" font-size="7">0x00</text>
+        </g>
+
+        <!-- ANALYZE Node (completed) -->
+        <g filter="url(#glow-green)">
+          <rect x="218" y="118" width="80" height="56" rx="4" fill="#0a0a0a" stroke="#00ff41" stroke-width="1.5"/>
+          <text x="258" y="136" text-anchor="middle" fill="#00ff41" font-family="'JetBrains Mono', monospace" font-size="9" font-weight="bold">ANALYZE</text>
+          <text x="258" y="150" text-anchor="middle" fill="#00ff4160" font-family="'JetBrains Mono', monospace" font-size="7">read 12 files</text>
+          <text x="258" y="163" text-anchor="middle" fill="#00ff41" font-family="'JetBrains Mono', monospace" font-size="8">[DONE ✓]</text>
+          <!-- Corner badge -->
+          <rect x="282" y="114" width="20" height="12" rx="2" fill="#00ff41"/>
+          <text x="292" y="123" text-anchor="middle" fill="#0a0a0a" font-family="'JetBrains Mono', monospace" font-size="7" font-weight="bold">OK</text>
+        </g>
+
+        <!-- DESIGN Node (completed) -->
+        <g filter="url(#glow-green)">
+          <rect x="378" y="178" width="80" height="56" rx="4" fill="#0a0a0a" stroke="#00ff41" stroke-width="1.5"/>
+          <text x="418" y="196" text-anchor="middle" fill="#00ff41" font-family="'JetBrains Mono', monospace" font-size="9" font-weight="bold">DESIGN</text>
+          <text x="418" y="210" text-anchor="middle" fill="#00ff4160" font-family="'JetBrains Mono', monospace" font-size="7">JWT + REST</text>
+          <text x="418" y="223" text-anchor="middle" fill="#00ff41" font-family="'JetBrains Mono', monospace" font-size="8">[DONE ✓]</text>
+          <rect x="442" y="174" width="20" height="12" rx="2" fill="#00ff41"/>
+          <text x="452" y="183" text-anchor="middle" fill="#0a0a0a" font-family="'JetBrains Mono', monospace" font-size="7" font-weight="bold">OK</text>
+        </g>
+
+        <!-- BUILD Node (ACTIVE — glowing yellow) -->
+        <g>
+          <!-- Outer pulse ring -->
+          <rect x="495" y="258" width="100" height="70" rx="6" fill="none" stroke="#facc15" stroke-width="1" opacity="0.2">
+            <animate attributeName="opacity" values="0.2;0.05;0.2" dur="2s" repeatCount="indefinite"/>
+            <animate attributeName="x" values="491;488;491" dur="2s" repeatCount="indefinite"/>
+            <animate attributeName="y" values="254;251;254" dur="2s" repeatCount="indefinite"/>
+            <animate attributeName="width" values="108;114;108" dur="2s" repeatCount="indefinite"/>
+            <animate attributeName="height" values="78;84;78" dur="2s" repeatCount="indefinite"/>
+          </rect>
+          <!-- Main box -->
+          <rect x="500" y="263" width="90" height="60" rx="4" fill="#0a0a0a" stroke="#facc15" stroke-width="2" filter="url(#glow-yellow)"/>
+          <text x="545" y="281" text-anchor="middle" fill="#facc15" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="bold">BUILD</text>
+          <text x="545" y="295" text-anchor="middle" fill="#facc1580" font-family="'JetBrains Mono', monospace" font-size="7">writing api/</text>
+          <text x="545" y="310" text-anchor="middle" fill="#facc15" font-family="'JetBrains Mono', monospace" font-size="8">
+            <animate attributeName="textLength" values="40;50;40" dur="1s" repeatCount="indefinite"/>
+            [ACTIVE ▸]
+          </text>
+          <!-- Activity indicator -->
+          <g transform="translate(545, 318)">
+            <rect x="-18" y="0" width="4" height="4" rx="1" fill="#facc15">
+              <animate attributeName="opacity" values="1;0.2;1" dur="0.6s" repeatCount="indefinite"/>
+            </rect>
+            <rect x="-8" y="0" width="4" height="4" rx="1" fill="#facc15">
+              <animate attributeName="opacity" values="0.2;1;0.2" dur="0.6s" repeatCount="indefinite"/>
+            </rect>
+            <rect x="2" y="0" width="4" height="4" rx="1" fill="#facc15">
+              <animate attributeName="opacity" values="1;0.2;1" dur="0.8s" repeatCount="indefinite"/>
+            </rect>
+            <rect x="12" y="0" width="4" height="4" rx="1" fill="#facc15">
+              <animate attributeName="opacity" values="0.2;1;0.2" dur="0.8s" repeatCount="indefinite"/>
+            </rect>
+          </g>
+          <!-- Corner badge -->
+          <rect x="570" y="259" width="24" height="12" rx="2" fill="#facc15">
+            <animate attributeName="opacity" values="1;0.6;1" dur="1.5s" repeatCount="indefinite"/>
+          </rect>
+          <text x="582" y="268" text-anchor="middle" fill="#0a0a0a" font-family="'JetBrains Mono', monospace" font-size="7" font-weight="bold">RUN</text>
+        </g>
+
+        <!-- BUG Node (side quest) -->
+        <g>
+          <rect x="420" y="393" width="75" height="45" rx="4" fill="#0a0a0a" stroke="#ff3333" stroke-width="1.5" stroke-dasharray="4,3" filter="url(#glow-red)"/>
+          <text x="457" y="410" text-anchor="middle" fill="#ff3333" font-family="'JetBrains Mono', monospace" font-size="8" font-weight="bold">BUG #41</text>
+          <text x="457" y="423" text-anchor="middle" fill="#ff333360" font-family="'JetBrains Mono', monospace" font-size="7">auth.ts:27</text>
+          <text x="457" y="434" text-anchor="middle" fill="#22d3ee" font-family="'JetBrains Mono', monospace" font-size="7">[PATCHED]</text>
+        </g>
+
+        <!-- TEST Node (future) -->
+        <g opacity="0.3">
+          <rect x="668" y="168" width="75" height="50" rx="4" fill="#0a0a0a" stroke="#00ff41" stroke-width="1" stroke-dasharray="4,4"/>
+          <text x="705" y="190" text-anchor="middle" fill="#00ff41" font-family="'JetBrains Mono', monospace" font-size="9">TEST</text>
+          <text x="705" y="205" text-anchor="middle" fill="#00ff4140" font-family="'JetBrains Mono', monospace" font-size="7">[PENDING]</text>
+        </g>
+
+        <!-- DEPLOY Node (future) -->
+        <g opacity="0.2">
+          <rect x="775" y="255" width="75" height="50" rx="4" fill="#0a0a0a" stroke="#00ff41" stroke-width="1" stroke-dasharray="4,4"/>
+          <text x="812" y="277" text-anchor="middle" fill="#00ff41" font-family="'JetBrains Mono', monospace" font-size="9">DEPLOY</text>
+          <text x="812" y="292" text-anchor="middle" fill="#00ff4140" font-family="'JetBrains Mono', monospace" font-size="7">[PENDING]</text>
+        </g>
+
+      </svg>
+
+      <!-- Log feed overlay -->
+      <div class="log-feed">
+        <div style="opacity:0.2">[09:41:02] agent.read → src/config.ts</div>
+        <div style="opacity:0.3">[09:41:05] agent.read → src/middleware/auth.ts</div>
+        <div style="opacity:0.4">[09:41:08] agent.write → src/api/login.ts (+47 lines)</div>
+        <div style="opacity:0.5">[09:41:12] agent.exec → npm test (exit: 1)</div>
+        <div style="opacity:0.6">[09:41:15] ⚠ BUG DETECTED → auth.ts:27 null ref</div>
+        <div style="opacity:0.7">[09:41:18] agent.write → src/middleware/auth.ts (patch)</div>
+        <div class="log-new">[09:41:22] agent.write → src/api/routes.ts (+23 lines)</div>
+      </div>
+    </div>
+
+    <!-- Bottom Bar -->
+    <div class="bottom-bar">
+      <span>NEUROGRAPH v0.1.0 // OPENACP PLUGIN</span>
+      <span>NODES: 6 // EDGES: 7 // DETOURS: 1</span>
+      <span>UPTIME: 00:04:22 // MEM: 47MB</span>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#000;overflow:hidden;font-family:'JetBrains Mono','Fira Code',monospace;color:#00ff41}
+  canvas{display:block}
+  .hud{position:fixed;z-index:100;pointer-events:none}
+  .top{top:0;left:0;right:0;padding:12px 20px;display:flex;justify-content:space-between;align-items:center;background:linear-gradient(180deg,rgba(0,0,0,.85),transparent)}
+  .logo{font-size:18px;font-weight:bold;letter-spacing:4px;text-shadow:0 0 10px #00ff41,0 0 30px #00ff4140}
+  .stats{display:flex;gap:20px;font-size:11px;letter-spacing:1px;color:#00ff4199}
+  .live::before{content:'';display:inline-block;width:6px;height:6px;background:#00ff41;border-radius:50%;margin-right:6px;box-shadow:0 0 8px #00ff41;animation:blink 1.5s infinite;vertical-align:middle}
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+  .bot{bottom:0;left:0;right:0;padding:8px 20px;background:linear-gradient(0deg,rgba(0,0,0,.85),transparent)}
+  .pbar{height:3px;background:#00ff4120;border-radius:2px;margin-bottom:6px}
+  .pfill{height:100%;width:47%;background:linear-gradient(90deg,#00ff41,#00ff4180);box-shadow:0 0 12px #00ff41;border-radius:2px}
+  .btext{display:flex;justify-content:space-between;font-size:10px;color:#00ff4160;letter-spacing:.5px}
+
+  /* ── ACTIVE DETAIL PANEL ── */
+  #detail-panel{
+    position:fixed;top:50%;right:20px;transform:translateY(-50%);z-index:150;
+    width:280px;background:rgba(0,0,0,.92);border:1px solid #facc1540;border-radius:8px;
+    padding:16px;backdrop-filter:blur(12px);box-shadow:0 0 30px rgba(250,204,21,.08);
+    pointer-events:none;
+  }
+  #detail-panel .dp-header{
+    display:flex;align-items:center;gap:8px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid #facc1520;
+  }
+  #detail-panel .dp-dot{
+    width:10px;height:10px;background:#facc15;border-radius:50%;box-shadow:0 0 10px #facc15;
+    animation:pulse-dot 1.5s infinite;
+  }
+  @keyframes pulse-dot{0%,100%{box-shadow:0 0 6px #facc15}50%{box-shadow:0 0 16px #facc15,0 0 30px #facc1540}}
+  #detail-panel .dp-title{font-size:14px;font-weight:bold;color:#facc15;letter-spacing:1px}
+  #detail-panel .dp-status{font-size:10px;color:#facc1580;margin-left:auto}
+
+  #detail-panel .dp-section{margin-bottom:10px}
+  #detail-panel .dp-label{font-size:9px;color:#facc1560;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px}
+  #detail-panel .dp-value{font-size:11px;color:#e2e8f0;line-height:1.7}
+  #detail-panel .dp-file{color:#facc15}
+  #detail-panel .dp-dim{color:#e2e8f080}
+
+  #detail-panel .dp-activity{margin-top:10px;padding-top:10px;border-top:1px solid #facc1520}
+  #detail-panel .dp-log{font-size:9px;color:#00ff4180;line-height:1.8}
+  #detail-panel .dp-log-new{color:#00ff41}
+  .typing-dots::after{content:'';animation:tdots 1s infinite}
+  @keyframes tdots{0%{content:'▸'}33%{content:'▸▸'}66%{content:'▸▸▸'}}
+
+  /* ── NODE TOOLTIP ── */
+  #tt{position:fixed;z-index:200;background:rgba(0,0,0,.92);border:1px solid #00ff4140;border-radius:6px;padding:12px 16px;font-size:11px;pointer-events:none;display:none;backdrop-filter:blur(8px);max-width:260px;box-shadow:0 0 20px rgba(0,255,65,.1)}
+  #tt b{display:block;font-size:14px;margin-bottom:6px}
+  #tt i{display:block;color:#00ff4180;font-size:10px;line-height:1.6;font-style:normal;white-space:pre-line}
+  #tt .tt-st{margin-top:6px;padding-top:6px;border-top:1px solid #00ff4120;font-size:10px}
+
+  /* ── STEP INDICATORS (bottom left) ── */
+  #steps{
+    position:fixed;bottom:50px;left:20px;z-index:150;pointer-events:none;
+  }
+  .step{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:11px}
+  .step-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;border:1.5px solid transparent}
+  .step-done .step-dot{background:#00ff41;border-color:#00ff41;box-shadow:0 0 6px #00ff41}
+  .step-active .step-dot{background:#facc15;border-color:#facc15;box-shadow:0 0 10px #facc15;animation:pulse-dot 1.5s infinite}
+  .step-pending .step-dot{background:transparent;border-color:#00ff4130}
+  .step-detour .step-dot{background:#ff4444;border-color:#ff4444;box-shadow:0 0 6px #ff4444}
+  .step-done .step-text{color:#00ff41}
+  .step-active .step-text{color:#facc15;font-weight:bold}
+  .step-pending .step-text{color:#00ff4130}
+  .step-detour .step-text{color:#ff444480;font-size:10px;margin-left:10px}
+  .step-line{width:1px;height:10px;background:#00ff4120;margin-left:4.5px;margin-bottom:2px}
+  .step-line-done{background:#00ff4160}
+</style>
+</head>
+<body>
+
+<div class="hud top">
+  <div class="logo">N E U X O N</div>
+  <div class="stats">
+    <span class="live">LIVE TRACE</span>
+    <span>SESSION #a7f2</span>
+    <span>CLAUDE-CODE</span>
+    <span style="color:#00ff41">47%</span>
+  </div>
+</div>
+<div class="hud bot">
+  <div class="pbar"><div class="pfill"></div></div>
+  <div class="btext">
+    <span>NEUXON v0.1.0</span>
+    <span>8 NODES // 9 SYNAPSES</span>
+    <span>DRAG ROTATE // SCROLL ZOOM // CLICK FOCUS</span>
+  </div>
+</div>
+
+<!-- Step list (left side) -->
+<div id="steps">
+  <div class="step step-done"><div class="step-dot"></div><span class="step-text">INIT</span></div>
+  <div class="step-line step-line-done"></div>
+  <div class="step step-done"><div class="step-dot"></div><span class="step-text">ANALYZE</span></div>
+  <div class="step-line step-line-done"></div>
+  <div class="step step-done"><div class="step-dot"></div><span class="step-text">UNDERSTAND</span></div>
+  <div class="step-line step-line-done"></div>
+  <div class="step step-done"><div class="step-dot"></div><span class="step-text">DESIGN</span></div>
+  <div class="step-line step-line-done"></div>
+  <div class="step step-active"><div class="step-dot"></div><span class="step-text">BUILD API</span></div>
+  <div class="step step-detour"><div class="step-dot"></div><span class="step-text">↳ BUG #41 (patched)</span></div>
+  <div class="step-line"></div>
+  <div class="step step-pending"><div class="step-dot"></div><span class="step-text">TEST</span></div>
+  <div class="step-line"></div>
+  <div class="step step-pending"><div class="step-dot"></div><span class="step-text">DEPLOY</span></div>
+</div>
+
+<!-- Active node detail panel (right side) -->
+<div id="detail-panel">
+  <div class="dp-header">
+    <div class="dp-dot"></div>
+    <div class="dp-title">BUILD API</div>
+    <div class="dp-status">STEP 5/7</div>
+  </div>
+
+  <div class="dp-section">
+    <div class="dp-label">Currently doing</div>
+    <div class="dp-value">Writing REST endpoints<br>for user authentication</div>
+  </div>
+
+  <div class="dp-section">
+    <div class="dp-label">Files touched</div>
+    <div class="dp-value">
+      <span class="dp-file">src/api/routes.ts</span> <span class="dp-dim">+47 lines</span><br>
+      <span class="dp-file">src/api/login.ts</span> <span class="dp-dim">+23 lines</span><br>
+      <span class="dp-file">src/middleware/auth.ts</span> <span class="dp-dim">patched</span>
+    </div>
+  </div>
+
+  <div class="dp-section">
+    <div class="dp-label">Decisions made</div>
+    <div class="dp-value dp-dim">JWT with RS256 signing<br>Refresh token rotation</div>
+  </div>
+
+  <div class="dp-activity">
+    <div class="dp-label">Live activity <span class="typing-dots"></span></div>
+    <div class="dp-log">
+      <div>[09:41:18] write auth.ts <span class="dp-dim">(patch)</span></div>
+      <div>[09:41:22] write routes.ts <span class="dp-dim">(+23)</span></div>
+      <div class="dp-log-new">[09:41:25] read config.ts <span class="typing-dots"></span></div>
+    </div>
+  </div>
+</div>
+
+<div id="tt"><b></b><i></i><div class="tt-st"></div></div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.164.1/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const NODES = [
+  { id:'init',       label:'INIT',       pos:[-65,0,0],    status:'completed', detail:'Session started\nWorkspace loaded' },
+  { id:'analyze',    label:'ANALYZE',    pos:[-38,22,18],  status:'completed', detail:'Read 12 files\nFound 3 entry points\nMapped imports' },
+  { id:'understand', label:'UNDERSTAND', pos:[-12,5,-22],  status:'completed', detail:'Dependency graph built\nAuth pattern identified\nExisting tests found' },
+  { id:'design',     label:'DESIGN',     pos:[12,28,12],   status:'completed', detail:'JWT + REST architecture\n4 endpoints defined\nError handling planned' },
+  { id:'build',      label:'BUILD API',  pos:[38,0,-6],    status:'active',    detail:'Writing src/api/routes.ts\nPOST /auth/login\n+47 lines' },
+  { id:'bug',        label:'BUG #41',    pos:[28,-28,22],  status:'detour',    detail:'auth.ts:27 null ref\nPatched in 12 seconds' },
+  { id:'test',       label:'TEST',       pos:[58,22,18],   status:'pending',   detail:'Waiting for build' },
+  { id:'deploy',     label:'DEPLOY',     pos:[75,5,-12],   status:'pending',   detail:'Production deploy' },
+];
+
+const EDGES = [
+  { from:'init',      to:'analyze',    label:'starts_with', status:'completed' },
+  { from:'analyze',   to:'understand', label:'reveals',     status:'completed' },
+  { from:'understand',to:'design',     label:'informs',     status:'completed' },
+  { from:'analyze',   to:'design',     label:'context',     status:'completed' },
+  { from:'design',    to:'build',      label:'decided →',   status:'active' },
+  { from:'build',     to:'bug',        label:'discovered!', status:'detour' },
+  { from:'bug',       to:'build',      label:'patched ↩',   status:'resolved' },
+  { from:'build',     to:'test',       label:'next',        status:'pending' },
+  { from:'test',      to:'deploy',     label:'then',        status:'pending' },
+];
+
+const COLORS = {
+  completed: 0x00ff41,
+  active:    0xfacc15,
+  pending:   0x1a3a1a,
+  detour:    0xff4444,
+  resolved:  0x22d3ee,
+};
+// Brighter versions for core spheres
+const BRIGHT = {
+  completed: 0x40ff80,
+  active:    0xffdd44,
+  pending:   0x1a3a1a,
+  detour:    0xff6666,
+  resolved:  0x44eeff,
+};
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x000008, 0.004);
+
+const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 1000);
+camera.position.set(5, 30, 100);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setClearColor(0x000008);
+document.body.prepend(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.05;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 0.25;
+controls.minDistance = 30;
+controls.maxDistance = 250;
+
+function makeLabel(text, color, size = 0.8, opacity = 1) {
+  const c = document.createElement('canvas');
+  const ctx = c.getContext('2d');
+  c.width = 512; c.height = 128;
+  ctx.font = `bold ${Math.round(size * 42)}px JetBrains Mono, Fira Code, monospace`;
+  ctx.fillStyle = '#' + color.toString(16).padStart(6,'0');
+  ctx.globalAlpha = opacity;
+  ctx.textAlign = 'center';
+  ctx.shadowColor = '#' + color.toString(16).padStart(6,'0');
+  ctx.shadowBlur = 8;
+  ctx.fillText(text, 256, 65);
+  const tex = new THREE.CanvasTexture(c);
+  const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
+  const s = new THREE.Sprite(mat);
+  s.scale.set(size * 18, size * 4.5, 1);
+  return s;
+}
+
+const nodeMap = {};
+const coreMeshes = [];
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+
+// ── NODES ──
+NODES.forEach(n => {
+  const g = new THREE.Group();
+  g.position.set(...n.pos);
+  g.userData = n;
+
+  const col = COLORS[n.status];
+  const bright = BRIGHT[n.status];
+  const isA = n.status === 'active';
+  const isP = n.status === 'pending';
+  const isD = n.status === 'detour';
+
+  // Core — BRIGHTER
+  const sz = isA ? 4 : (isP ? 1.5 : 2.5);
+  const core = new THREE.Mesh(
+    new THREE.SphereGeometry(sz, 24, 24),
+    new THREE.MeshBasicMaterial({ color: bright, transparent: true, opacity: isP ? 0.2 : 1 })
+  );
+  g.add(core);
+  n._core = core;
+  coreMeshes.push(core);
+
+  // Inner glow
+  const g1 = new THREE.Mesh(
+    new THREE.SphereGeometry(sz * 1.8, 16, 16),
+    new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: isA ? 0.2 : (isP ? 0.02 : 0.1), side: THREE.BackSide })
+  );
+  g.add(g1);
+  n._g1 = g1;
+
+  // Outer glow — bigger, softer
+  const g2 = new THREE.Mesh(
+    new THREE.SphereGeometry(sz * 3.5, 12, 12),
+    new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: isA ? 0.08 : (isP ? 0.01 : 0.03), side: THREE.BackSide })
+  );
+  g.add(g2);
+  n._g2 = g2;
+
+  // Active: rings
+  if (isA) {
+    const r1 = new THREE.Mesh(
+      new THREE.TorusGeometry(7, 0.2, 8, 48),
+      new THREE.MeshBasicMaterial({ color: bright, transparent: true, opacity: 0.5 })
+    );
+    g.add(r1); n._r1 = r1;
+
+    const r2 = new THREE.Mesh(
+      new THREE.TorusGeometry(9, 0.12, 8, 48),
+      new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.2 })
+    );
+    r2.rotation.x = Math.PI / 2;
+    g.add(r2); n._r2 = r2;
+
+    const r3 = new THREE.Mesh(
+      new THREE.TorusGeometry(11, 0.08, 8, 48),
+      new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.08 })
+    );
+    r3.rotation.x = Math.PI / 3;
+    r3.rotation.z = Math.PI / 4;
+    g.add(r3); n._r3 = r3;
+  }
+
+  // Detour: octahedron
+  if (isD) {
+    const w = new THREE.Mesh(
+      new THREE.OctahedronGeometry(sz * 2.2, 0),
+      new THREE.MeshBasicMaterial({ color: bright, transparent: true, opacity: 0.25, wireframe: true })
+    );
+    g.add(w); n._w = w;
+  }
+
+  // Label — brighter, with glow
+  const lbl = makeLabel(n.label, isP ? 0x1a4a1a : bright, isP ? 0.5 : 0.75);
+  lbl.position.y = -(sz + 4);
+  g.add(lbl);
+
+  // Status label
+  const stText = isA ? '▸ ACTIVE' : n.status==='completed' ? '✓ DONE' :
+                 isD ? '⚠ DETOUR' : n.status==='resolved' ? '↩ FIXED' : '· · ·';
+  const sub = makeLabel(stText, isP ? 0x1a3a1a : col, isP ? 0.35 : 0.45, isP ? 0.3 : 0.7);
+  sub.position.y = -(sz + 6.5);
+  g.add(sub);
+
+  scene.add(g);
+  nodeMap[n.id] = g;
+});
+
+// ── EDGES ──
+EDGES.forEach(e => {
+  const from = NODES.find(n => n.id === e.from);
+  const to = NODES.find(n => n.id === e.to);
+  const col = COLORS[e.status];
+  const isP = e.status === 'pending';
+
+  const s = new THREE.Vector3(...from.pos);
+  const d = new THREE.Vector3(...to.pos);
+
+  // Tube geometry for non-pending (thicker, more visible)
+  if (!isP) {
+    const path = new THREE.LineCurve3(s, d);
+    const tubeGeo = new THREE.TubeGeometry(path, 1, e.status === 'active' ? 0.15 : 0.08, 6, false);
+    const tubeMat = new THREE.MeshBasicMaterial({
+      color: col, transparent: true,
+      opacity: e.status === 'active' ? 0.7 : 0.4,
+    });
+    scene.add(new THREE.Mesh(tubeGeo, tubeMat));
+  } else {
+    // Thin dashed line for pending
+    const geo = new THREE.BufferGeometry().setFromPoints([s, d]);
+    scene.add(new THREE.Line(geo, new THREE.LineBasicMaterial({ color: 0x1a3a1a, transparent: true, opacity: 0.15 })));
+  }
+
+  // Edge label
+  const mid = s.clone().lerp(d, 0.5);
+  mid.y += 2;
+  const lbl = makeLabel(e.label, isP ? 0x1a3a1a : col, isP ? 0.25 : 0.38, isP ? 0.15 : 0.5);
+  lbl.position.copy(mid);
+  scene.add(lbl);
+
+  // Arrow
+  if (!isP) {
+    const dir = d.clone().sub(s).normalize();
+    const aPos = s.clone().lerp(d, 0.8);
+    const arrow = new THREE.Mesh(
+      new THREE.ConeGeometry(0.6, 2.5, 6),
+      new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.7 })
+    );
+    arrow.position.copy(aPos);
+    arrow.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), dir);
+    scene.add(arrow);
+  }
+
+  // Particles — BIGGER, BRIGHTER
+  if (!isP) {
+    const count = e.status === 'active' ? 6 : 3;
+    e._particles = [];
+    for (let i = 0; i < count; i++) {
+      const pSize = e.status === 'active' ? 0.5 : 0.3;
+      const p = new THREE.Mesh(
+        new THREE.SphereGeometry(pSize, 8, 8),
+        new THREE.MeshBasicMaterial({ color: BRIGHT[e.status] || col, transparent: true, opacity: 0.9 })
+      );
+      p.userData = { start: s, end: d, speed: 0.003 + Math.random() * 0.005, t: i / count };
+      scene.add(p);
+      e._particles.push(p);
+
+      // Particle glow trail
+      const pg = new THREE.Mesh(
+        new THREE.SphereGeometry(pSize * 2.5, 6, 6),
+        new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.15, side: THREE.BackSide })
+      );
+      p.add(pg);
+    }
+  }
+});
+
+// ── STARS ──
+const starGeo = new THREE.BufferGeometry();
+const sv = [];
+for (let i = 0; i < 1200; i++) sv.push((Math.random()-.5)*500, (Math.random()-.5)*500, (Math.random()-.5)*500);
+starGeo.setAttribute('position', new THREE.Float32BufferAttribute(sv, 3));
+scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0x00ff41, size: 0.3, transparent: true, opacity: 0.12 })));
+
+// ── ANIMATE ──
+let t = 0;
+function animate() {
+  requestAnimationFrame(animate);
+  t += 0.015;
+
+  NODES.forEach(n => {
+    if (n._r1) { n._r1.rotation.x = t; n._r1.rotation.z = t * 0.6; }
+    if (n._r2) { n._r2.rotation.y = t * 0.8; n._r2.rotation.z = t * 0.3; }
+    if (n._r3) { n._r3.rotation.x = t * 0.4; n._r3.rotation.y = t * 0.9; }
+    if (n._w) { n._w.rotation.x = t * 0.5; n._w.rotation.y = t * 0.7; }
+    if (n.status === 'active') {
+      n._core.material.opacity = 0.7 + Math.sin(t * 3) * 0.3;
+      n._g1.material.opacity = 0.12 + Math.sin(t * 2) * 0.1;
+      n._g2.material.opacity = 0.05 + Math.sin(t * 1.5) * 0.04;
+      n._core.scale.setScalar(1 + Math.sin(t * 2) * 0.12);
+    }
+  });
+
+  EDGES.forEach(e => {
+    if (e._particles) {
+      e._particles.forEach(p => {
+        p.userData.t = (p.userData.t + p.userData.speed) % 1;
+        p.position.copy(p.userData.start.clone().lerp(p.userData.end, p.userData.t));
+        p.material.opacity = Math.sin(p.userData.t * Math.PI) * 0.9;
+      });
+    }
+  });
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+animate();
+
+// ── INTERACTION ──
+window.addEventListener('mousemove', ev => {
+  mouse.x = (ev.clientX / innerWidth) * 2 - 1;
+  mouse.y = -(ev.clientY / innerHeight) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObjects(coreMeshes);
+  const tt = document.getElementById('tt');
+  renderer.domElement.style.cursor = hits.length ? 'pointer' : 'grab';
+  if (hits.length) {
+    const nd = hits[0].object.parent.userData;
+    const hex = '#' + (BRIGHT[nd.status] || COLORS[nd.status]).toString(16).padStart(6,'0');
+    tt.querySelector('b').textContent = nd.label;
+    tt.querySelector('b').style.color = hex;
+    tt.querySelector('i').textContent = nd.detail;
+    tt.querySelector('.tt-st').innerHTML = '<span style="color:'+hex+'">● '+nd.status.toUpperCase()+'</span>';
+    tt.style.display = 'block';
+    tt.style.borderColor = hex + '50';
+    tt.style.left = (ev.clientX + 15) + 'px';
+    tt.style.top = (ev.clientY + 15) + 'px';
+  } else {
+    tt.style.display = 'none';
+  }
+});
+
+window.addEventListener('click', ev => {
+  mouse.x = (ev.clientX / innerWidth) * 2 - 1;
+  mouse.y = -(ev.clientY / innerHeight) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObjects(coreMeshes);
+  if (hits.length) {
+    const target = hits[0].object.parent.position;
+    controls.target.copy(target);
+  }
+});
+
+window.addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>

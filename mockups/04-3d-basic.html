@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#000;overflow:hidden;font-family:'JetBrains Mono','Fira Code',monospace;color:#00ff41}
+  canvas{display:block}
+  .hud{position:fixed;z-index:100;pointer-events:none}
+  .top{top:0;left:0;right:0;padding:12px 20px;display:flex;justify-content:space-between;align-items:center;background:linear-gradient(180deg,rgba(0,0,0,.85),transparent)}
+  .logo{font-size:18px;font-weight:bold;letter-spacing:4px;text-shadow:0 0 10px #00ff41,0 0 30px #00ff4140}
+  .stats{display:flex;gap:20px;font-size:11px;letter-spacing:1px;color:#00ff4199}
+  .live::before{content:'';display:inline-block;width:6px;height:6px;background:#00ff41;border-radius:50%;margin-right:6px;box-shadow:0 0 8px #00ff41;animation:blink 1.5s infinite;vertical-align:middle}
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+  .bot{bottom:0;left:0;right:0;padding:8px 20px;background:linear-gradient(0deg,rgba(0,0,0,.85),transparent)}
+  .pbar{height:2px;background:#00ff4115;border-radius:1px;margin-bottom:6px}
+  .pfill{height:100%;width:47%;background:#00ff41;box-shadow:0 0 10px #00ff41;border-radius:1px}
+  .btext{display:flex;justify-content:space-between;font-size:10px;color:#00ff4150;letter-spacing:.5px}
+  .leg{bottom:50px;right:20px;font-size:10px;color:#00ff4180;line-height:2.2;text-align:right}
+  .ld{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px;vertical-align:middle}
+  #tt{position:fixed;z-index:200;background:rgba(0,0,0,.92);border:1px solid #00ff4140;border-radius:4px;padding:10px 14px;font-size:11px;pointer-events:none;display:none;backdrop-filter:blur(8px);max-width:260px;box-shadow:0 0 20px rgba(0,255,65,.1)}
+  #tt b{display:block;font-size:13px;margin-bottom:4px}
+  #tt i{display:block;color:#00ff4180;font-size:10px;line-height:1.6;font-style:normal;white-space:pre-line}
+</style>
+</head>
+<body>
+
+<div class="hud top">
+  <div class="logo">N E U X O N</div>
+  <div class="stats">
+    <span class="live">LIVE TRACE</span>
+    <span>SESSION #a7f2</span>
+    <span>CLAUDE-CODE</span>
+    <span style="color:#00ff41">47% MAPPED</span>
+  </div>
+</div>
+<div class="hud bot">
+  <div class="pbar"><div class="pfill"></div></div>
+  <div class="btext">
+    <span>NEUXON v0.1.0 // OPENACP PLUGIN</span>
+    <span>NODES: 8 // SYNAPSES: 9</span>
+    <span>DRAG TO ROTATE // SCROLL TO ZOOM</span>
+  </div>
+</div>
+<div class="hud leg">
+  <div><span class="ld" style="background:#00ff41;box-shadow:0 0 6px #00ff41"></span>COMPLETED</div>
+  <div><span class="ld" style="background:#facc15;box-shadow:0 0 6px #facc15"></span>ACTIVE</div>
+  <div><span class="ld" style="background:#1a3a1a;border:1px solid #00ff4140"></span>PENDING</div>
+  <div><span class="ld" style="background:#ff4444;box-shadow:0 0 6px #ff4444"></span>DETOUR</div>
+  <div><span class="ld" style="background:#22d3ee;box-shadow:0 0 6px #22d3ee"></span>RESOLVED</div>
+</div>
+<div id="tt"><b></b><i></i></div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.164.1/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ── DATA ──
+const NODES = [
+  { id:'init',       label:'INIT',       pos:[-60,0,0],    status:'completed', detail:'Session initialized' },
+  { id:'analyze',    label:'ANALYZE',    pos:[-35,20,15],  status:'completed', detail:'Read 12 files\nParsed project structure' },
+  { id:'understand', label:'UNDERSTAND', pos:[-10,5,-20],  status:'completed', detail:'Mapped dependencies\nIdentified auth pattern' },
+  { id:'design',     label:'DESIGN',     pos:[10,25,10],   status:'completed', detail:'Chose JWT + REST\nDefined 4 endpoints' },
+  { id:'build',      label:'BUILD API',  pos:[35,0,-5],    status:'active',    detail:'Writing src/api/routes.ts\n+47 lines' },
+  { id:'bug',        label:'BUG #41',    pos:[25,-25,20],  status:'detour',    detail:'auth.ts:27 null ref\nPatched in 12s' },
+  { id:'test',       label:'TEST',       pos:[55,20,15],   status:'pending',   detail:'Waiting for build' },
+  { id:'deploy',     label:'DEPLOY',     pos:[70,5,-10],   status:'pending',   detail:'Production deploy' },
+];
+
+const EDGES = [
+  { from:'init',      to:'analyze',    label:'starts_with', status:'completed' },
+  { from:'analyze',   to:'understand', label:'reveals',     status:'completed' },
+  { from:'understand',to:'design',     label:'informs',     status:'completed' },
+  { from:'analyze',   to:'design',     label:'context',     status:'completed' },
+  { from:'design',    to:'build',      label:'decided →',   status:'active' },
+  { from:'build',     to:'bug',        label:'discovered!', status:'detour' },
+  { from:'bug',       to:'build',      label:'patched ↩',   status:'resolved' },
+  { from:'build',     to:'test',       label:'next',        status:'pending' },
+  { from:'test',      to:'deploy',     label:'then',        status:'pending' },
+];
+
+const COLORS = {
+  completed: 0x00ff41,
+  active:    0xfacc15,
+  pending:   0x1a3a1a,
+  detour:    0xff4444,
+  resolved:  0x22d3ee,
+};
+
+// ── SCENE SETUP ──
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x000008, 0.006);
+
+const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 1000);
+camera.position.set(0, 40, 100);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setClearColor(0x000008);
+document.body.prepend(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.05;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 0.3;
+controls.minDistance = 30;
+controls.maxDistance = 250;
+
+// ── HELPERS ──
+function makeTextSprite(text, color, size = 0.8) {
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = 512; canvas.height = 128;
+  ctx.font = `bold ${Math.round(size * 40)}px JetBrains Mono, Fira Code, monospace`;
+  ctx.fillStyle = '#' + color.toString(16).padStart(6,'0');
+  ctx.textAlign = 'center';
+  ctx.fillText(text, 256, 60);
+  const tex = new THREE.CanvasTexture(canvas);
+  const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
+  const s = new THREE.Sprite(mat);
+  s.scale.set(size * 18, size * 4.5, 1);
+  return s;
+}
+
+// ── BUILD NODES ──
+const nodeMap = {};
+const nodeMeshes = [];
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+
+NODES.forEach(n => {
+  const group = new THREE.Group();
+  group.position.set(...n.pos);
+  group.userData = n;
+
+  const col = COLORS[n.status];
+  const isActive = n.status === 'active';
+  const isPending = n.status === 'pending';
+  const isDetour = n.status === 'detour';
+
+  // Core sphere
+  const coreSize = isActive ? 3 : (isPending ? 1.5 : 2);
+  const coreMat = new THREE.MeshBasicMaterial({
+    color: col, transparent: true,
+    opacity: isPending ? 0.15 : 0.9,
+  });
+  const core = new THREE.Mesh(new THREE.SphereGeometry(coreSize, 24, 24), coreMat);
+  group.add(core);
+  n._core = core;
+
+  // Outer glow
+  const glowMat = new THREE.MeshBasicMaterial({
+    color: col, transparent: true,
+    opacity: isActive ? 0.08 : (isPending ? 0.01 : 0.04),
+    side: THREE.BackSide,
+  });
+  const glow = new THREE.Mesh(new THREE.SphereGeometry(coreSize * 3, 16, 16), glowMat);
+  group.add(glow);
+  n._glow = glow;
+
+  // Active: double torus rings
+  if (isActive) {
+    const r1 = new THREE.Mesh(
+      new THREE.TorusGeometry(5, 0.15, 8, 48),
+      new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.4 })
+    );
+    group.add(r1);
+    n._ring1 = r1;
+
+    const r2 = new THREE.Mesh(
+      new THREE.TorusGeometry(6.5, 0.1, 8, 48),
+      new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.15 })
+    );
+    r2.rotation.x = Math.PI / 2;
+    group.add(r2);
+    n._ring2 = r2;
+  }
+
+  // Detour: wireframe octahedron
+  if (isDetour) {
+    const w = new THREE.Mesh(
+      new THREE.OctahedronGeometry(coreSize * 2, 0),
+      new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.2, wireframe: true })
+    );
+    group.add(w);
+    n._wire = w;
+  }
+
+  // Label
+  const label = makeTextSprite(n.label, col, isPending ? 0.5 : 0.7);
+  label.position.y = -(coreSize + 3);
+  group.add(label);
+
+  // Status text
+  const stText = isActive ? '▸ ACTIVE' : n.status === 'completed' ? '✓ DONE' :
+                 isDetour ? '! DETOUR' : n.status === 'resolved' ? '↩ PATCHED' : '· · ·';
+  const sub = makeTextSprite(stText, col, isPending ? 0.35 : 0.45);
+  sub.position.y = -(coreSize + 5.5);
+  sub.material.opacity = isPending ? 0.2 : 0.6;
+  group.add(sub);
+
+  scene.add(group);
+  nodeMap[n.id] = group;
+  nodeMeshes.push(core);
+});
+
+// ── BUILD EDGES ──
+EDGES.forEach(e => {
+  const from = NODES.find(n => n.id === e.from);
+  const to = NODES.find(n => n.id === e.to);
+  const col = COLORS[e.status];
+  const isPending = e.status === 'pending';
+
+  const start = new THREE.Vector3(...from.pos);
+  const end = new THREE.Vector3(...to.pos);
+
+  // Line
+  const geo = new THREE.BufferGeometry().setFromPoints([start, end]);
+  const mat = new THREE.LineBasicMaterial({
+    color: col, transparent: true,
+    opacity: isPending ? 0.08 : (e.status === 'active' ? 0.6 : 0.35),
+  });
+  scene.add(new THREE.Line(geo, mat));
+
+  // Edge label
+  const mid = start.clone().lerp(end, 0.5);
+  mid.y += 1.5;
+  const lbl = makeTextSprite(e.label, col, isPending ? 0.3 : 0.4);
+  lbl.position.copy(mid);
+  lbl.material.opacity = isPending ? 0.1 : 0.35;
+  scene.add(lbl);
+
+  // Arrow
+  if (!isPending) {
+    const dir = end.clone().sub(start).normalize();
+    const arrowPos = start.clone().lerp(end, 0.82);
+    const arrowGeo = new THREE.ConeGeometry(0.5, 2, 6);
+    const arrowMat = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.6 });
+    const arrow = new THREE.Mesh(arrowGeo, arrowMat);
+    arrow.position.copy(arrowPos);
+    arrow.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), dir);
+    scene.add(arrow);
+  }
+
+  // Particles (neural signals!)
+  if (!isPending) {
+    const count = e.status === 'active' ? 5 : 2;
+    for (let i = 0; i < count; i++) {
+      const pGeo = new THREE.SphereGeometry(e.status === 'active' ? 0.4 : 0.25, 8, 8);
+      const pMat = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.8 });
+      const p = new THREE.Mesh(pGeo, pMat);
+      p.userData = { start, end, speed: 0.003 + Math.random() * 0.004, t: i / count };
+      scene.add(p);
+      e._particles = e._particles || [];
+      e._particles.push(p);
+    }
+  }
+
+  e._data = { start, end };
+});
+
+// ── BACKGROUND STARS ──
+const starGeo = new THREE.BufferGeometry();
+const starVerts = [];
+for (let i = 0; i < 800; i++) {
+  starVerts.push((Math.random() - 0.5) * 400, (Math.random() - 0.5) * 400, (Math.random() - 0.5) * 400);
+}
+starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starVerts, 3));
+const starMat = new THREE.PointsMaterial({ color: 0x00ff41, size: 0.3, transparent: true, opacity: 0.15 });
+scene.add(new THREE.Points(starGeo, starMat));
+
+// ── ANIMATION ──
+let t = 0;
+function animate() {
+  requestAnimationFrame(animate);
+  t += 0.015;
+
+  // Node animations
+  NODES.forEach(n => {
+    if (n._ring1) { n._ring1.rotation.x = t; n._ring1.rotation.z = t * 0.6; }
+    if (n._ring2) { n._ring2.rotation.y = t * 0.8; n._ring2.rotation.z = t * 0.4; }
+    if (n._wire) { n._wire.rotation.x = t * 0.5; n._wire.rotation.y = t * 0.7; }
+    if (n.status === 'active') {
+      n._core.material.opacity = 0.6 + Math.sin(t * 3) * 0.35;
+      n._glow.material.opacity = 0.05 + Math.sin(t * 2) * 0.05;
+      n._core.scale.setScalar(1 + Math.sin(t * 2) * 0.1);
+    }
+  });
+
+  // Particle flow along edges
+  EDGES.forEach(e => {
+    if (e._particles) {
+      e._particles.forEach(p => {
+        p.userData.t = (p.userData.t + p.userData.speed) % 1;
+        const pos = p.userData.start.clone().lerp(p.userData.end, p.userData.t);
+        p.position.copy(pos);
+        // Fade in/out at endpoints
+        const fade = Math.sin(p.userData.t * Math.PI);
+        p.material.opacity = fade * 0.8;
+      });
+    }
+  });
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+animate();
+
+// ── HOVER / CLICK ──
+function onMove(ev) {
+  mouse.x = (ev.clientX / innerWidth) * 2 - 1;
+  mouse.y = -(ev.clientY / innerHeight) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObjects(nodeMeshes);
+  const tt = document.getElementById('tt');
+  if (hits.length > 0) {
+    const nd = hits[0].object.parent.userData;
+    const col = '#' + COLORS[nd.status].toString(16).padStart(6,'0');
+    tt.querySelector('b').textContent = nd.label;
+    tt.querySelector('i').textContent = nd.detail;
+    tt.style.display = 'block';
+    tt.style.borderColor = col + '60';
+    tt.style.left = (ev.clientX + 15) + 'px';
+    tt.style.top = (ev.clientY + 15) + 'px';
+    renderer.domElement.style.cursor = 'pointer';
+  } else {
+    tt.style.display = 'none';
+    renderer.domElement.style.cursor = 'grab';
+  }
+}
+
+function onClick(ev) {
+  mouse.x = (ev.clientX / innerWidth) * 2 - 1;
+  mouse.y = -(ev.clientY / innerHeight) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObjects(nodeMeshes);
+  if (hits.length > 0) {
+    const target = hits[0].object.parent.position;
+    controls.target.copy(target);
+    controls.update();
+  }
+}
+
+window.addEventListener('mousemove', onMove);
+window.addEventListener('click', onClick);
+window.addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>
