@@ -9,7 +9,7 @@ export default defineConfig({
   sourcemap: true,
   dts: true,
   clean: true,
-  external: ["@openacp/cli"],
+  external: ["@openacp/cli", "sql.js", "@xenova/transformers"],
   noExternal: [/.*/],
   esbuildOptions(options) {
     options.resolveExtensions = [".ts", ".js", ".mjs"];

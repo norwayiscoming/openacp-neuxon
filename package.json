@@ -20,7 +20,13 @@
     "test:watch": "vitest",
     "prepublishOnly": "npm run build"
   },
-  "keywords": ["openacp", "openacp-plugin", "neuxon", "graph", "visualization"],
+  "keywords": [
+    "openacp",
+    "openacp-plugin",
+    "neuxon",
+    "graph",
+    "visualization"
+  ],
   "engines": {
     "node": ">=20",
     "openacp": ">=2026.0326.0"
@@ -29,9 +35,11 @@
     "@openacp/cli": ">=2026.0326.0"
   },
   "dependencies": {
-    "hono": "^4.7.0",
     "@hono/node-server": "^1.13.0",
+    "@xenova/transformers": "^2.17.2",
+    "hono": "^4.7.0",
     "nanoid": "^5.0.0",
+    "sql.js": "^1.14.1",
     "zod": "^3.23.0"
   },
   "devDependencies": {
