@@ -1,0 +1,44 @@
+{
+  "name": "openacp-neuxon",
+  "version": "0.1.0",
+  "description": "AI journey graph — visualize agent progress as a real-time knowledge graph",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": ["openacp", "openacp-plugin", "neuxon", "graph", "visualization"],
+  "engines": {
+    "node": ">=20",
+    "openacp": ">=2026.0326.0"
+  },
+  "peerDependencies": {
+    "@openacp/cli": ">=2026.0326.0"
+  },
+  "dependencies": {
+    "hono": "^4.7.0",
+    "@hono/node-server": "^1.13.0",
+    "nanoid": "^5.0.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@openacp/cli": "file:../OpenACP",
+    "@types/node": "^22.0.0",
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.0",
+    "vitest": "^3.0.0"
+  }
+}
