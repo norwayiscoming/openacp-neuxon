@@ -17,12 +17,12 @@ export interface NeuxonCommandDef {
 export function createNeuxonCommand(
   store: GraphStore,
   getUrl: () => string,
-  _knowledgeIndex?: KnowledgeIndex,
+  knowledgeIndex?: KnowledgeIndex,
 ): NeuxonCommandDef {
   return {
     name: "neuxon",
     description: "View AI progress graph",
-    usage: "[status | sessions]",
+    usage: "[status | sessions | recall <topic> | refresh | forget <sessionId>]",
     category: "plugin",
 
     async handler(args) {
@@ -62,6 +62,40 @@ export function createNeuxonCommand(
           type: "text",
           text: `**Neuxon Progress:** ${graph.progress}% (${done}/${total} steps)\n${active ? `**Currently:** ${active.label} — ${active.layman}` : "Idle"}\n\n🔗 ${baseUrl}/?sessionId=${args.sessionId}`,
         };
+      }
+
+      if (subcommand.startsWith("recall")) {
+        const topic = (args.text ?? "").replace(/^recall\s*/i, "").trim();
+        if (!topic) {
+          return { type: "text", text: "Usage: `/neuxon recall <topic>`" };
+        }
+        if (!knowledgeIndex) {
+          return { type: "text", text: "Knowledge index not available." };
+        }
+        const results = await knowledgeIndex.search(topic, 5);
+        if (results.length === 0) {
+          return { type: "text", text: `No prior knowledge found for "${topic}".` };
+        }
+        const lines = results.map((r, i) =>
+          `${i + 1}. **Session ${r.sessionId.slice(0, 8)}** (score: ${(r.score * 100).toFixed(0)}%) — ${r.tags.map(t => `#${t}`).join(" ")}\n   ${(r.fullAnswer ?? "").slice(0, 100)}...`
+        );
+        return {
+          type: "text",
+          text: `**Neuxon Recall: "${topic}"**\n\n${lines.join("\n\n")}`,
+        };
+      }
+
+      if (subcommand.startsWith("forget")) {
+        const sid = (args.text ?? "").replace(/^forget\s*/i, "").trim();
+        if (!sid) {
+          return { type: "text", text: "Usage: `/neuxon forget <sessionId>`" };
+        }
+        store.deleteSession(sid);
+        return { type: "text", text: `Deleted knowledge for session ${sid}.` };
+      }
+
+      if (subcommand === "refresh") {
+        return { type: "text", text: "Refresh: re-send your last message and Neuxon will skip the cache." };
       }
 
       // Default: show link
