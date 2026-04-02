@@ -69,7 +69,14 @@ function createNeuxonPlugin(): OpenACPPlugin {
       const autoInject = config.autoInjectPrompt ?? true;
 
       // Initialize core components
-      store = await GraphStore.create();
+      let dbPath: string | undefined;
+      if (config.persistence !== false) {
+        const dir = path.join(process.cwd(), ".neuxon");
+        const { mkdirSync } = await import("node:fs");
+        mkdirSync(dir, { recursive: true });
+        dbPath = path.join(dir, "neuxon.db");
+      }
+      store = await GraphStore.create(dbPath);
 
       // Initialize knowledge index
       const knowledgeIndex = new KnowledgeIndex(store.getDb());

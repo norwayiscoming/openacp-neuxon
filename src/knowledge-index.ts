@@ -77,8 +77,11 @@ export class KnowledgeIndex {
   ): SearchResult[] {
     const queryTags = KnowledgeIndex.extractTags(queryText, []);
 
-    const scored = nodes.map((node) => {
-      const emb = node.embedding as Uint8Array;
+    const scored: SearchResult[] = [];
+    for (const node of nodes) {
+      const emb = node.embedding;
+      if (!(emb instanceof Uint8Array) || emb.byteLength % 4 !== 0) continue;
+
       const nodeEmbedding = new Float32Array(emb.buffer, emb.byteOffset, emb.byteLength / 4);
       let score = KnowledgeIndex.cosineSimilarity(queryEmbedding, nodeEmbedding);
 
@@ -88,7 +91,7 @@ export class KnowledgeIndex {
         score += (tagOverlap / nodeTags.length) * 0.1;
       }
 
-      return {
+      scored.push({
         nodeId: node.id,
         sessionId: node.session_id,
         label: node.label,
@@ -97,8 +100,8 @@ export class KnowledgeIndex {
         tags: nodeTags,
         fullAnswer: node.full_answer ?? null,
         createdAt: node.started_at ?? "",
-      } satisfies SearchResult;
-    });
+      } satisfies SearchResult);
+    }
 
     return scored.sort((a, b) => b.score - a.score).slice(0, topK);
   }

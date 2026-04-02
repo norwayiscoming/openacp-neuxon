@@ -89,6 +89,30 @@ describe("GraphBuilder", () => {
     expect(analyze.completedAt).not.toBeNull();
   });
 
+  it("sets fullAnswer on RESULT node at turn end", () => {
+    builder.initSession("sess-1", "claude");
+    builder.handleTextEvent(
+      "sess-1",
+      '[STEP name="Analyze" why="a" expect="b"]',
+    );
+    builder.handleTurnEnd("sess-1", "Here is the final answer about the topic.");
+    const graph = store.get("sess-1")!;
+    const resultNode = graph.nodes.find((n) => n.label === "RESULT")!;
+    expect(resultNode).toBeDefined();
+    expect(resultNode.fullAnswer).toBe("Here is the final answer about the topic.");
+  });
+
+  it("strips [STEP] blocks from fullAnswer", () => {
+    builder.initSession("sess-1", "claude");
+    builder.handleTurnEnd(
+      "sess-1",
+      '[STEP name="Plan" why="a" expect="b"] The actual answer.',
+    );
+    const graph = store.get("sess-1")!;
+    const resultNode = graph.nodes.find((n) => n.label === "RESULT")!;
+    expect(resultNode.fullAnswer).toBe("The actual answer.");
+  });
+
   it("emits SSE events on changes", () => {
     builder.initSession("sess-1", "claude");
     expect(onEvent).toHaveBeenCalled();

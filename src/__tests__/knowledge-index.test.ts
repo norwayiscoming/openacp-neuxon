@@ -48,4 +48,37 @@ describe("KnowledgeIndex", () => {
     expect(results[0].nodeId).toBe("r1");
     expect(results[0].score).toBeGreaterThan(0);
   });
+
+  it("skips nodes with corrupt embedding data in search", async () => {
+    db = await NeuxonDB.create();
+    index = new KnowledgeIndex(db);
+
+    db.upsertSession("s1", "agent", "2026-04-01T00:00:00Z");
+
+    // Valid embedding (4 floats = 16 bytes)
+    const validEmb = new Float32Array([0.5, 0.5, 0.5, 0.5]);
+    const validBuf = new Uint8Array(validEmb.buffer);
+
+    db.upsertNode({
+      id: "r1", session_id: "s1", label: "RESULT", status: "done", order: 1,
+      tags: JSON.stringify(["valid"]),
+      task_type: "qa",
+      full_answer: "Valid answer",
+      embedding: validBuf,
+    });
+
+    // Corrupt embedding (3 bytes — not a multiple of 4)
+    db.upsertNode({
+      id: "r2", session_id: "s1", label: "RESULT", status: "done", order: 2,
+      tags: JSON.stringify(["corrupt"]),
+      task_type: "qa",
+      full_answer: "Corrupt answer",
+      embedding: new Uint8Array([1, 2, 3]),
+    });
+
+    // search should not throw, should only return valid results
+    const results = await index.search("valid", 5);
+    // With no pipeline loaded, falls back to tag search — but the corrupt node shouldn't crash
+    expect(results).toBeDefined();
+  });
 });

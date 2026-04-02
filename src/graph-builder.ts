@@ -325,6 +325,7 @@ export class GraphBuilder {
       startedAt: new Date().toISOString(),
       completedAt: new Date().toISOString(),
       order: maxOrder + 1,
+      fullAnswer: cleanResponse || null,
     };
 
     this.store.addNode(sessionId, resultNode);

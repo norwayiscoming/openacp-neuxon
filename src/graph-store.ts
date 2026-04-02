@@ -212,7 +212,13 @@ export class GraphStore {
         order: row.order,
         taskType: (row.task_type as GraphNode["taskType"]) ?? null,
         tags: row.tags ? (JSON.parse(row.tags as string) as string[]) : undefined,
-        embedding: null,
+        embedding: row.embedding instanceof Uint8Array
+          ? new Float32Array(
+              row.embedding.buffer,
+              row.embedding.byteOffset,
+              row.embedding.byteLength / 4,
+            )
+          : null,
         fullAnswer: row.full_answer ?? null,
       };
     });
