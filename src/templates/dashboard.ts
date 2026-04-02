@@ -548,106 +548,68 @@ function boot(sessionId) {
   resize();
   window.addEventListener('resize', resize);
 
-  // ── POSITION NODES (Force-directed) ──
-  const SIM_W = 1200;
-  const SIM_H = 800;
-
+  // ── POSITION NODES (Server-computed via Dagre) ──
+  // Positions (x, y) come from the server API. This function just sets node radius
+  // and places any nodes that arrived via SSE without positions.
   function positionNodes() {
     if (NODES.length === 0) return;
 
-    // Set initial positions if not yet placed
+    // Build children map for sizing
     const children = {};
-    const hasParent = new Set();
     EDGES.forEach(e => {
       if (!children[e.from]) children[e.from] = [];
       children[e.from].push(e.to);
-      hasParent.add(e.to);
     });
 
-    // Size nodes
     NODES.forEach(n => {
       const isResult = n.label === 'RESULT';
       const isInit = n.label === 'INIT';
       const isPhase = (children[n.id] || []).length > 1;
       n.r = isResult ? 32 : isInit ? 34 : isPhase ? 30 : (n.status === 'active' ? 28 : 22);
-    });
 
-    // Place unpositioned nodes
-    NODES.forEach((n, i) => {
-      if (n.x !== undefined && n.y !== undefined) return;
-      if (n.label === 'INIT' || n.id === '__init__') {
-        n.x = 120; n.y = SIM_H / 2;
-      } else {
-        // Place near parent if possible
+      // If node has no position (arrived via SSE), place near parent
+      if (n.x === undefined || n.y === undefined) {
         const parentEdge = EDGES.find(e => e.to === n.id);
         const parent = parentEdge ? NODES.find(nd => nd.id === parentEdge.from) : null;
         if (parent && parent.x !== undefined) {
-          const angle = (Math.random() - 0.5) * Math.PI * 0.8;
-          n.x = parent.x + 180 + Math.random() * 40;
-          n.y = parent.y + Math.sin(angle) * 120;
+          n.x = parent.x + 160;
+          n.y = parent.y + (Math.random() - 0.5) * 100;
         } else {
-          n.x = 200 + i * 100;
-          n.y = SIM_H / 2 + (Math.random() - 0.5) * 300;
+          n.x = 200;
+          n.y = 200;
         }
       }
     });
-
-    // Run force simulation (few iterations for smooth incremental layout)
-    for (let iter = 0; iter < 60; iter++) {
-      // Repulsion between all nodes
-      for (let i = 0; i < NODES.length; i++) {
-        for (let j = i + 1; j < NODES.length; j++) {
-          const a = NODES[i], b = NODES[j];
-          let dx = b.x - a.x, dy = b.y - a.y;
-          let dist = Math.sqrt(dx * dx + dy * dy) || 1;
-          const minDist = (a.r + b.r) * 3.5;
-          if (dist < minDist) {
-            const force = (minDist - dist) / dist * 0.3;
-            const fx = dx * force, fy = dy * force;
-            if (a.label !== 'INIT' && a.id !== '__init__') { a.x -= fx; a.y -= fy; }
-            if (b.label !== 'INIT' && b.id !== '__init__') { b.x += fx; b.y += fy; }
-          }
-        }
-      }
-
-      // Attraction along edges (spring)
-      EDGES.forEach(e => {
-        const from = NODES.find(n => n.id === e.from);
-        const to = NODES.find(n => n.id === e.to);
-        if (!from || !to || from.x === undefined || to.x === undefined) return;
-        let dx = to.x - from.x, dy = to.y - from.y;
-        let dist = Math.sqrt(dx * dx + dy * dy) || 1;
-        const idealDist = 200;
-        const force = (dist - idealDist) / dist * 0.05;
-        const fx = dx * force, fy = dy * force;
-        if (from.label !== 'INIT' && from.id !== '__init__') { from.x += fx; from.y += fy; }
-        if (to.label !== 'INIT' && to.id !== '__init__') { to.x -= fx * 0.3; to.y -= fy * 0.3; }
-      });
-
-      // Pull children to the right of parents (directional bias)
-      EDGES.forEach(e => {
-        const from = NODES.find(n => n.id === e.from);
-        const to = NODES.find(n => n.id === e.to);
-        if (!from || !to || from.x === undefined || to.x === undefined) return;
-        if (to.x < from.x + 100) {
-          if (to.label !== 'INIT' && to.id !== '__init__') {
-            to.x += (from.x + 160 - to.x) * 0.1;
-          }
-        }
-      });
-
-      // Keep nodes in bounds
-      NODES.forEach(n => {
-        if (n.label === 'INIT' || n.id === '__init__') return;
-        n.x = Math.max(60, Math.min(SIM_W - 60, n.x));
-        n.y = Math.max(60, Math.min(SIM_H - 60, n.y));
-      });
-    }
   }
 
-  function scaleX(x) { return (x * (W / SIM_W)) * zoom + panX; }
-  function scaleY(y) { return (y * (H / SIM_H)) * zoom + panY; }
-  function scaleR(r) { return r * Math.min(W / SIM_W, H / SIM_H) * zoom; }
+  // Debounced re-fetch layout from server after graph changes
+  let layoutTimer = null;
+  function scheduleRefetchLayout() {
+    if (layoutTimer) clearTimeout(layoutTimer);
+    layoutTimer = setTimeout(refetchLayout, 300);
+  }
+
+  function refetchLayout() {
+    fetch(graphUrl)
+      .then(r => r.json())
+      .then(data => {
+        const serverNodes = (data.graph || data).nodes || data.nodes || [];
+        // Update positions from server
+        serverNodes.forEach(sn => {
+          const local = NODES.find(n => n.id === sn.id);
+          if (local && sn.x !== undefined) {
+            local.x = sn.x;
+            local.y = sn.y;
+          }
+        });
+        rebuildParticles();
+      })
+      .catch(() => {});
+  }
+
+  function scaleX(x) { return x * zoom + panX; }
+  function scaleY(y) { return y * zoom + panY; }
+  function scaleR(r) { return r * zoom; }
 
   // ── PARTICLES ──
   function rebuildParticles() {
@@ -1341,6 +1303,7 @@ function boot(sessionId) {
         positionNodes();
         rebuildParticles();
         renderSteps();
+        scheduleRefetchLayout();
         if (selectedNodeId === node.id) renderPanel(node.id);
       } catch(err) {}
     });
@@ -1376,6 +1339,7 @@ function boot(sessionId) {
         }
         rebuildParticles();
         renderSteps();
+        scheduleRefetchLayout();
       } catch(err) {}
     });
 

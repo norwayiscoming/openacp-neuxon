@@ -1,8 +1,44 @@
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
+import dagre from "@dagrejs/dagre";
 import type { GraphStore } from "./graph-store.js";
 import type { SSEEvent } from "./types.js";
 import { generateDashboardHtml } from "./templates/dashboard.js";
+
+function computeLayout(nodes: any[], edges: any[]): void {
+  const g = new dagre.graphlib.Graph();
+  g.setGraph({
+    rankdir: "LR",     // left to right
+    nodesep: 80,        // vertical spacing between nodes
+    ranksep: 160,       // horizontal spacing between layers
+    edgesep: 40,
+    marginx: 40,
+    marginy: 40,
+  });
+  g.setDefaultEdgeLabel(() => ({}));
+
+  for (const node of nodes) {
+    const isInit = node.label === "INIT";
+    const isResult = node.label === "RESULT";
+    const w = isInit ? 80 : isResult ? 80 : 70;
+    const h = isInit ? 80 : isResult ? 80 : 60;
+    g.setNode(node.id, { width: w, height: h });
+  }
+
+  for (const edge of edges) {
+    g.setEdge(edge.from, edge.to);
+  }
+
+  dagre.layout(g);
+
+  for (const node of nodes) {
+    const pos = g.node(node.id);
+    if (pos) {
+      node.x = pos.x;
+      node.y = pos.y;
+    }
+  }
+}
 
 export function createNeuxonApp(store: GraphStore): Hono {
   const app = new Hono();
@@ -23,7 +59,10 @@ export function createNeuxonApp(store: GraphStore): Hono {
   app.get("/api/graph/:sessionId", (c) => {
     const graph = store.get(c.req.param("sessionId"));
     if (!graph) return c.json({ error: "not found" }, 404);
-    return c.json(graph);
+    const nodes = graph.nodes.map((n) => ({ ...n }));
+    const edges = graph.edges.map((e) => ({ ...e }));
+    computeLayout(nodes, edges);
+    return c.json({ ...graph, nodes, edges });
   });
 
   // Merged graph of all sessions — single INIT, each session branches out
@@ -67,6 +106,7 @@ export function createNeuxonApp(store: GraphStore): Hono {
       }
     }
 
+    computeLayout(allNodes, allEdges);
     return c.json({ nodes: allNodes, edges: allEdges });
   });
 
