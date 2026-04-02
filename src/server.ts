@@ -1,41 +1,70 @@
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
-import dagre from "@dagrejs/dagre";
 import type { GraphStore } from "./graph-store.js";
 import type { SSEEvent } from "./types.js";
 import { generateDashboardHtml } from "./templates/dashboard.js";
 
-function computeLayout(nodes: any[], edges: any[]): void {
-  const g = new dagre.graphlib.Graph();
-  g.setGraph({
-    rankdir: "LR",     // left to right
-    nodesep: 80,        // vertical spacing between nodes
-    ranksep: 160,       // horizontal spacing between layers
-    edgesep: 40,
-    marginx: 40,
-    marginy: 40,
+function computeRadialLayout(nodes: any[], edges: any[]): void {
+  if (nodes.length === 0) return;
+
+  const children = new Map<string, string[]>();
+  for (const e of edges) {
+    if (!children.has(e.from)) children.set(e.from, []);
+    children.get(e.from)!.push(e.to);
+  }
+
+  const root = nodes.find((n) => n.label === "INIT") ?? nodes[0];
+  root.x = 0;
+  root.y = 0;
+  root.z = 0;
+
+  const positioned = new Set<string>([root.id]);
+  const nodeMap = new Map(nodes.map((n) => [n.id, n]));
+
+  const rootChildren = children.get(root.id) ?? [];
+  const angleStep = rootChildren.length > 1
+    ? (2 * Math.PI) / rootChildren.length
+    : Math.PI / 3;
+
+  let seed = 42;
+  const rand = () => { seed = (seed * 16807 + 0) % 2147483647; return (seed - 1) / 2147483646; };
+
+  rootChildren.forEach((childId, i) => {
+    const baseAngle = rootChildren.length > 1
+      ? angleStep * i
+      : -Math.PI / 6;
+    const queue: Array<{ id: string; depth: number; angle: number }> = [
+      { id: childId, depth: 1, angle: baseAngle },
+    ];
+
+    while (queue.length > 0) {
+      const cur = queue.shift()!;
+      const node = nodeMap.get(cur.id);
+      if (!node || positioned.has(cur.id)) continue;
+      positioned.add(cur.id);
+
+      const dist = cur.depth * 80;
+      const arcOffset = rootChildren.length <= 1 ? cur.depth * 0.15 : 0;
+      const finalAngle = cur.angle + arcOffset;
+
+      node.x = Math.cos(finalAngle) * dist + (rand() - 0.5) * 30;
+      node.y = (rand() - 0.5) * 20;
+      node.z = Math.sin(finalAngle) * dist + (rand() - 0.5) * 30;
+
+      const nodeChildren = children.get(cur.id) ?? [];
+      const spread = nodeChildren.length > 1 ? 0.8 : 0.4;
+      nodeChildren.forEach((cid, j) => {
+        const subAngle = finalAngle + (j - (nodeChildren.length - 1) / 2) * spread;
+        queue.push({ id: cid, depth: cur.depth + 1, angle: subAngle });
+      });
+    }
   });
-  g.setDefaultEdgeLabel(() => ({}));
 
-  for (const node of nodes) {
-    const isInit = node.label === "INIT";
-    const isResult = node.label === "RESULT";
-    const w = isInit ? 80 : isResult ? 80 : 70;
-    const h = isInit ? 80 : isResult ? 80 : 60;
-    g.setNode(node.id, { width: w, height: h });
-  }
-
-  for (const edge of edges) {
-    g.setEdge(edge.from, edge.to);
-  }
-
-  dagre.layout(g);
-
-  for (const node of nodes) {
-    const pos = g.node(node.id);
-    if (pos) {
-      node.x = pos.x;
-      node.y = pos.y;
+  for (const n of nodes) {
+    if (!positioned.has(n.id)) {
+      n.x = (rand() - 0.5) * 50;
+      n.y = (rand() - 0.5) * 30;
+      n.z = (rand() - 0.5) * 50;
     }
   }
 }
@@ -61,7 +90,7 @@ export function createNeuxonApp(store: GraphStore): Hono {
     if (!graph) return c.json({ error: "not found" }, 404);
     const nodes = graph.nodes.map((n) => ({ ...n }));
     const edges = graph.edges.map((e) => ({ ...e }));
-    computeLayout(nodes, edges);
+    computeRadialLayout(nodes, edges);
     return c.json({ ...graph, nodes, edges });
   });
 
@@ -106,7 +135,7 @@ export function createNeuxonApp(store: GraphStore): Hono {
       }
     }
 
-    computeLayout(allNodes, allEdges);
+    computeRadialLayout(allNodes, allEdges);
     return c.json({ nodes: allNodes, edges: allEdges });
   });
 

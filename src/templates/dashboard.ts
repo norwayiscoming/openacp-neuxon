@@ -4,6 +4,13 @@ export function generateDashboardHtml(): string {
 <head>
 <meta charset="utf-8">
 <title>NEUXON — AI Journey Graph</title>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js"
+  }
+}
+</script>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
   body {
@@ -18,31 +25,10 @@ export function generateDashboardHtml(): string {
   /* ── LAYOUT ── */
   .layout {
     display: grid;
-    grid-template-columns: 220px 1fr;
-    grid-template-rows: 48px 1fr var(--panel-height, 220px) 36px;
+    grid-template-columns: 220px 1fr 320px;
+    grid-template-rows: 48px 1fr 36px;
     height: 100vh;
   }
-
-  /* ── EMPTY STATE ── */
-  .empty-state {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    height: 100vh;
-    color: #8b949e;
-    font-size: 16px;
-    text-align: center;
-  }
-  .empty-state h1 {
-    font-family: 'JetBrains Mono', 'Fira Code', monospace;
-    font-size: 24px;
-    color: #00ff41;
-    text-shadow: 0 0 12px #00ff4150;
-    letter-spacing: 4px;
-    margin-bottom: 24px;
-  }
-  .empty-state p { max-width: 400px; line-height: 1.7; }
 
   /* ── TOP BAR ── */
   .topbar {
@@ -54,14 +40,15 @@ export function generateDashboardHtml(): string {
     padding: 0 20px;
     background: #0d1117;
     border-bottom: 1px solid #1a2030;
+    z-index: 10;
   }
   .logo {
     font-family: 'JetBrains Mono', 'Fira Code', monospace;
     font-size: 15px;
     font-weight: 700;
     letter-spacing: 4px;
-    color: #00ff41;
-    text-shadow: 0 0 12px #00ff4150;
+    color: #c084fc;
+    text-shadow: 0 0 12px #c084fc50;
   }
   .topbar-right {
     display: flex;
@@ -75,20 +62,23 @@ export function generateDashboardHtml(): string {
     display: flex;
     align-items: center;
     gap: 6px;
-    color: #00ff41;
+    color: #22d3ee;
     font-weight: 600;
   }
   .live-badge::before {
     content: '';
     width: 8px; height: 8px;
-    background: #00ff41;
+    background: #22d3ee;
     border-radius: 50%;
-    box-shadow: 0 0 8px #00ff41;
+    box-shadow: 0 0 8px #22d3ee;
     animation: pulse 2s infinite;
   }
   .live-badge.disconnected { color: #ff4444; }
-  .live-badge.disconnected::before { background: #ff4444; box-shadow: 0 0 8px #ff4444; }
-  @keyframes pulse { 0%,100%{opacity:1;box-shadow:0 0 8px #00ff41} 50%{opacity:.5;box-shadow:0 0 4px #00ff41} }
+  .live-badge.disconnected::before { background: #ff4444; box-shadow: 0 0 8px #ff4444; animation: none; }
+  @keyframes pulse {
+    0%,100% { opacity:1; box-shadow:0 0 8px #22d3ee; }
+    50% { opacity:.5; box-shadow:0 0 4px #22d3ee; }
+  }
 
   /* ── LEFT PANEL: Steps ── */
   .steps-panel {
@@ -96,309 +86,148 @@ export function generateDashboardHtml(): string {
     grid-row: 2;
     background: #0d1117;
     border-right: 1px solid #1a2030;
-    padding: 20px 16px;
+    padding: 16px 12px;
     overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    z-index: 5;
   }
-  .steps-title {
+  .steps-panel h3 {
+    font-family: 'JetBrains Mono', monospace;
     font-size: 10px;
-    font-weight: 700;
     letter-spacing: 2px;
     color: #8b949e;
     text-transform: uppercase;
-    margin-bottom: 16px;
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #1a2030;
   }
-  .step {
+  .step-item {
     display: flex;
     align-items: flex-start;
-    gap: 10px;
-    margin-bottom: 4px;
-    padding: 6px 8px;
+    gap: 8px;
+    padding: 8px 10px;
     border-radius: 6px;
-    transition: background .2s;
     cursor: pointer;
+    transition: background 0.15s;
+    font-size: 11px;
+    line-height: 1.4;
   }
-  .step:hover { background: #161b22; }
-  .step-marker {
-    width: 20px; height: 20px;
+  .step-item:hover { background: #161b22; }
+  .step-item.selected { background: #1c2030; border-left: 2px solid #a78bfa; }
+  .step-dot {
+    width: 8px; height: 8px;
     border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 10px;
-    font-weight: 700;
+    margin-top: 3px;
     flex-shrink: 0;
-    margin-top: 1px;
   }
-  .step-content { flex: 1; }
-  .step-name { font-size: 15px; font-weight: 600; margin-bottom: 2px; }
-  .step-desc { font-size: 12px; color: #8b949e; }
-
-  .step-done .step-marker { background: #00ff41; color: #0a0e14; }
-  .step-done .step-name { color: #00ff41; }
-
-  .step-result .step-marker { background: #818cf8; color: #fff; box-shadow: 0 0 12px #818cf860; }
-  .step-result .step-name { color: #a5b4fc; font-weight: 700; }
-  .step-result { background: #818cf810; border-radius: 6px; }
-
-  .step-active .step-marker {
-    background: #facc15; color: #0a0e14;
-    box-shadow: 0 0 12px #facc1560;
-    animation: marker-pulse 2s infinite;
+  .step-dot.done { background: #22d3ee; opacity: 0.6; }
+  .step-dot.active { background: #a78bfa; box-shadow: 0 0 6px #a78bfa; animation: pulse-violet 1.5s infinite; }
+  .step-dot.detour { background: #f97316; }
+  .step-dot.pending { background: #4b5563; }
+  @keyframes pulse-violet {
+    0%,100% { box-shadow: 0 0 6px #a78bfa; }
+    50% { box-shadow: 0 0 12px #a78bfa; }
   }
-  @keyframes marker-pulse { 0%,100%{box-shadow:0 0 8px #facc1560} 50%{box-shadow:0 0 20px #facc1580} }
-  .step-active .step-name { color: #facc15; font-weight: 700; }
-  .step-active { background: #facc1510; border-radius: 6px; }
-
-  .step-pending .step-marker { background: transparent; border: 2px solid #4a5a70; color: #5a6a7e; }
-  .step-pending .step-name { color: #6a7a8e; }
-  .step-pending .step-desc { color: #4a5a6e; }
-
-  .step-detour { margin-left: 20px; }
-  .step-detour .step-marker { background: #ff4444; color: #fff; font-size: 9px; box-shadow: 0 0 8px #ff444440; }
-  .step-detour .step-name { color: #ff8888; font-size: 12px; }
-
-  .step-connector {
-    width: 2px; height: 12px;
-    background: #1a2030;
-    margin-left: 17px;
-    margin-bottom: 4px;
-  }
-  .step-connector-done { background: #00ff4140; }
-
-  .progress-section {
-    margin-top: 20px;
-    padding-top: 16px;
-    border-top: 1px solid #1a2030;
-  }
-  .progress-label {
-    display: flex;
-    justify-content: space-between;
+  .step-label {
+    color: #c9d1d9;
+    font-family: 'JetBrains Mono', monospace;
     font-size: 10px;
-    color: #8b949e;
-    margin-bottom: 6px;
     font-weight: 600;
-    letter-spacing: 1px;
+    letter-spacing: 0.5px;
   }
-  .progress-track {
-    height: 6px;
-    background: #1a2030;
-    border-radius: 3px;
-    overflow: hidden;
-  }
-  .progress-fill {
-    height: 100%;
-    background: linear-gradient(90deg, #00ff41, #00ff4180);
-    border-radius: 3px;
-    box-shadow: 0 0 10px #00ff4140;
-    transition: width 0.5s ease;
+  .step-layman {
+    color: #8b949e;
+    font-size: 10px;
+    margin-top: 2px;
   }
 
-  /* ── CENTER: Graph Canvas ── */
-  .graph-area {
+  /* ── CENTER: Three.js canvas wrapper ── */
+  .canvas-wrap {
     grid-column: 2;
     grid-row: 2;
     position: relative;
-    background: #0a0e14;
     overflow: hidden;
+    background: #0a0e14;
   }
-  .graph-area canvas { display: block; cursor: grab; }
-  .zoom-controls {
+  #three-canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+  #label-canvas {
     position: absolute;
-    bottom: 12px;
-    right: 12px;
-    display: flex;
-    gap: 4px;
-    z-index: 20;
+    top: 0; left: 0;
+    pointer-events: none;
+    width: 100%;
+    height: 100%;
   }
-  .zoom-btn {
-    width: 32px; height: 32px;
-    background: #161b22;
-    border: 1px solid #2a3040;
-    border-radius: 6px;
-    color: #8b949e;
-    font-size: 18px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background .2s;
-  }
-  .zoom-btn:hover { background: #1f2937; color: #e0e0e0; }
 
-  /* ── BOTTOM PANEL: Detail ── */
+  /* ── RIGHT PANEL: Detail ── */
   .detail-panel {
-    grid-column: 1 / -1;
-    grid-row: 3;
+    grid-column: 3;
+    grid-row: 2;
     background: #0d1117;
-    border-top: 1px solid #1a2030;
-    padding: 12px 24px;
+    border-left: 1px solid #1a2030;
+    padding: 20px 16px;
     overflow-y: auto;
-    position: relative;
-    min-height: 120px;
-    max-height: 400px;
-  }
-
-  /* Resize handle */
-  .resize-handle {
-    position: absolute;
-    left: 0;
-    right: 0;
-    top: 0;
-    height: 6px;
-    cursor: row-resize;
-    z-index: 10;
-    transition: background .2s;
-  }
-  .resize-handle:hover, .resize-handle.dragging {
-    background: #facc1540;
-  }
-  .dp-row {
     display: flex;
-    gap: 24px;
-    align-items: flex-start;
+    flex-direction: column;
+    gap: 14px;
+    font-size: 12px;
+    resize: horizontal;
+    min-width: 200px;
+    max-width: 500px;
+    z-index: 5;
   }
-  .dp-col { flex: 1; min-width: 0; }
-  .dp-header {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 12px;
-    padding-bottom: 10px;
+  .detail-panel h3 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: #8b949e;
+    text-transform: uppercase;
+    padding-bottom: 8px;
     border-bottom: 1px solid #1a2030;
   }
-  .dp-icon {
-    width: 32px; height: 32px;
-    background: #facc15;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 16px;
-    color: #0a0e14;
-    font-weight: 700;
-    box-shadow: 0 0 16px #facc1530;
-  }
-  .dp-title { font-size: 18px; font-weight: 700; color: #facc15; }
-  .dp-subtitle { font-size: 13px; color: #8b949e; }
-
-  .dp-section { margin-bottom: 16px; }
-  .dp-label {
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 1.5px;
-    color: #6b7280;
-    text-transform: uppercase;
-    margin-bottom: 6px;
-  }
-  .dp-value { font-size: 14px; color: #e0e0e0; line-height: 1.7; }
-  .dp-file {
-    display: inline-block;
-    background: #1a2030;
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-family: 'JetBrains Mono', monospace;
+  .detail-empty {
+    color: #4b5563;
     font-size: 11px;
-    color: #facc15;
-    margin: 2px 0;
-  }
-  .dp-change {
-    font-size: 11px;
-    color: #00ff41;
-    font-family: 'JetBrains Mono', monospace;
-  }
-  .dp-dim { color: #6b7280; }
-
-  .dp-decision {
-    background: #161b22;
-    border-left: 3px solid #818cf8;
-    padding: 8px 12px;
-    border-radius: 0 6px 6px 0;
-    font-size: 12px;
-    color: #c4b5fd;
-    line-height: 1.6;
-  }
-
-  .dp-layman {
-    background: #111820;
-    border: 1px solid #1a2535;
-    border-radius: 8px;
-    padding: 14px 16px;
-    font-size: 14px;
-    color: #d0d8e0;
+    text-align: center;
+    margin-top: 40px;
     line-height: 1.8;
-    max-height: 160px;
-    overflow-y: auto;
-    white-space: pre-wrap;
   }
-  .dp-layman-title {
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 1px;
-    color: #facc15;
-    margin-bottom: 6px;
-    text-transform: uppercase;
-  }
-  .dp-cause {
-    background: #0d1520;
-    border-left: 3px solid #00ff41;
-    padding: 8px 12px;
-    border-radius: 0 6px 6px 0;
-    font-size: 12px;
-    color: #a0b0c0;
-    line-height: 1.7;
-    margin-top: 8px;
-  }
-  .dp-cause b { color: #00ff41; font-weight: 600; }
-  .dp-expect {
-    background: #0d1520;
-    border-left: 3px solid #818cf8;
-    padding: 8px 12px;
-    border-radius: 0 6px 6px 0;
-    font-size: 12px;
-    color: #a0b0c0;
-    line-height: 1.7;
-    margin-top: 8px;
-  }
-  .dp-expect b { color: #818cf8; font-weight: 600; }
-
-  .dp-activity {
-    margin-top: 16px;
-    padding-top: 14px;
-    border-top: 1px solid #1a2030;
-  }
-  .dp-log-line {
+  .detail-field { display: flex; flex-direction: column; gap: 4px; }
+  .detail-field-label {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 12px;
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
     color: #6b7280;
-    line-height: 2;
-    display: flex;
-    gap: 6px;
   }
-  .dp-log-time { color: #4a5568; }
-  .dp-log-action { color: #00ff41; }
-  .dp-log-new { color: #e0e0e0; }
-  .dp-log-new .dp-log-action { color: #facc15; }
-
-  .typing-indicator {
-    display: inline-flex;
-    gap: 3px;
-    margin-left: 4px;
-    vertical-align: middle;
+  .detail-field-value {
+    color: #c9d1d9;
+    line-height: 1.5;
+    font-size: 11px;
   }
-  .typing-indicator span {
-    width: 4px; height: 4px;
-    background: #facc15;
-    border-radius: 50%;
-    animation: typing 1.2s infinite;
+  .status-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 600;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.5px;
   }
-  .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
-  .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
-  @keyframes typing { 0%,100%{opacity:.2;transform:scale(.8)} 50%{opacity:1;transform:scale(1.1)} }
+  .status-badge.done { background: #0e3a4a; color: #22d3ee; }
+  .status-badge.active { background: #2d1f4a; color: #a78bfa; }
+  .status-badge.detour { background: #3a1f0a; color: #f97316; }
+  .status-badge.pending { background: #1a1f2a; color: #6b7280; }
 
   /* ── BOTTOM BAR ── */
   .bottombar {
     grid-column: 1 / -1;
-    grid-row: 4;
+    grid-row: 3;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -407,978 +236,852 @@ export function generateDashboardHtml(): string {
     border-top: 1px solid #1a2030;
     font-family: 'JetBrains Mono', monospace;
     font-size: 10px;
-    color: #4a5568;
+    color: #8b949e;
+    z-index: 10;
+  }
+  .progress-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+    max-width: 400px;
+  }
+  .progress-bar-bg {
+    flex: 1;
+    height: 3px;
+    background: #1a2030;
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #22d3ee, #c084fc);
+    border-radius: 2px;
+    transition: width 0.4s ease;
+    width: 0%;
+  }
+  .progress-pct {
+    color: #c9d1d9;
+    min-width: 32px;
+    text-align: right;
   }
 
   /* ── TOOLTIP ── */
   #tooltip {
     position: fixed;
-    z-index: 300;
-    background: #161b22;
-    border: 1px solid #2a3040;
-    border-radius: 8px;
-    padding: 12px 16px;
-    font-size: 12px;
     pointer-events: none;
+    background: rgba(13,17,23,0.92);
+    border: 1px solid #1a2030;
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+    color: #c9d1d9;
+    z-index: 100;
     display: none;
-    box-shadow: 0 8px 32px rgba(0,0,0,.5);
-    max-width: 240px;
+    max-width: 220px;
+    line-height: 1.5;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
   }
-  #tooltip .tt-name { font-weight: 700; font-size: 14px; margin-bottom: 4px; }
-  #tooltip .tt-desc { color: #8b949e; font-size: 11px; line-height: 1.6; white-space: pre-line; }
-  #tooltip .tt-status { margin-top: 6px; font-size: 11px; font-weight: 600; }
 
-  .dp-empty {
-    text-align: center;
-    color: #4a5568;
-    padding: 40px 20px;
-    font-size: 13px;
-    line-height: 1.8;
+  /* ── SESSION SELECTOR ── */
+  .session-select {
+    background: #161b22;
+    border: 1px solid #1a2030;
+    color: #c9d1d9;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    outline: none;
   }
-  .dp-empty-icon { font-size: 32px; margin-bottom: 12px; }
+  .session-select:focus { border-color: #c084fc; }
 </style>
 </head>
 <body>
+<div class="layout" id="layout">
+  <!-- TOP BAR -->
+  <div class="topbar">
+    <div class="logo">NEUXON</div>
+    <div class="topbar-right">
+      <select class="session-select" id="sessionSelect">
+        <option value="">All sessions</option>
+      </select>
+      <span id="sessionCount" style="color:#8b949e">0 sessions</span>
+      <span id="nodeCount" style="color:#8b949e">0 nodes</span>
+      <span class="live-badge disconnected" id="liveBadge">LIVE</span>
+    </div>
+  </div>
 
-<div id="app"></div>
-<div id="tooltip">
-  <div class="tt-name"></div>
-  <div class="tt-desc"></div>
-  <div class="tt-status"></div>
+  <!-- LEFT STEPS PANEL -->
+  <div class="steps-panel" id="stepsPanel">
+    <h3>Steps</h3>
+    <div id="stepsList" style="display:flex;flex-direction:column;gap:6px"></div>
+  </div>
+
+  <!-- CENTER THREE.JS -->
+  <div class="canvas-wrap" id="canvasWrap">
+    <canvas id="three-canvas"></canvas>
+    <canvas id="label-canvas"></canvas>
+  </div>
+
+  <!-- RIGHT DETAIL PANEL -->
+  <div class="detail-panel" id="detailPanel">
+    <h3>Node Detail</h3>
+    <div id="detailContent">
+      <div class="detail-empty">Click a node<br>to inspect it</div>
+    </div>
+  </div>
+
+  <!-- BOTTOM BAR -->
+  <div class="bottombar">
+    <div class="progress-wrap">
+      <span style="color:#6b7280;white-space:nowrap">Progress</span>
+      <div class="progress-bar-bg">
+        <div class="progress-bar-fill" id="progressFill"></div>
+      </div>
+      <span class="progress-pct" id="progressPct">0%</span>
+    </div>
+    <div style="display:flex;gap:20px;align-items:center">
+      <span id="bottomStatus" style="color:#6b7280">Waiting for data…</span>
+      <span style="color:#4b5563">Drag=pan · Scroll=zoom</span>
+    </div>
+  </div>
 </div>
 
-<script>
-// ── BOOTSTRAP ──
-const params = new URLSearchParams(location.search);
-const sessionId = params.get('sessionId');
+<div id="tooltip"></div>
 
-// No sessionId = show all sessions as knowledge graph
-boot(sessionId);
+<script type="module">
+import * as THREE from 'three';
 
-function boot(sessionId) {
-  const isAllMode = !sessionId;
-  const headerLabel = isAllMode ? 'Knowledge Graph' : ('Session #' + sessionId.slice(0, 4));
-  // Render the layout shell
-  document.getElementById('app').innerHTML = \`
-  <div class="layout">
-    <div class="topbar">
-      <div class="logo">NEUXON</div>
-      <div class="topbar-right">
-        <span class="live-badge" id="live-badge">LIVE</span>
-        <span>\${headerLabel}</span>
-        <span id="session-count"></span>
-      </div>
-    </div>
-    <div class="steps-panel" id="steps-panel">
-      <div class="steps-title">Journey</div>
-      <div id="steps-list"></div>
-      <div class="progress-section">
-        <div class="progress-label">
-          <span>PROGRESS</span>
-          <span id="progress-pct" style="color:#00ff41">0%</span>
-        </div>
-        <div class="progress-track">
-          <div class="progress-fill" id="progress-fill" style="width:0%"></div>
-        </div>
-      </div>
-    </div>
-    <div class="graph-area">
-      <canvas id="graph"></canvas>
-      <div class="zoom-controls">
-        <button class="zoom-btn" id="zoom-in" title="Zoom in">+</button>
-        <button class="zoom-btn" id="zoom-out" title="Zoom out">-</button>
-        <button class="zoom-btn" id="zoom-reset" title="Reset zoom">R</button>
-      </div>
-    </div>
-    <div class="detail-panel" id="detail-panel">
-      <div class="resize-handle" id="resize-handle"></div>
-      <div id="panel-content">
-        <div class="dp-empty">
-          <div class="dp-empty-icon">&#128269;</div>
-          Click a node to see details
-        </div>
-      </div>
-    </div>
-    <div class="bottombar">
-      <span>NEUXON v0.1.0 — OpenACP Plugin</span>
-      <span id="stats-bar">loading...</span>
-      <span>hover node for details</span>
-    </div>
-  </div>\`;
+// ── Color palette ──────────────────────────────────────────────────────────
+const C = {
+  qa:      0x22d3ee,
+  creative:0xc084fc,
+  active:  0xa78bfa,
+  detour:  0xf97316,
+  init:    0xc0c0c0,
+  result:  0x22d3ee,
+  bg:      0x0a0e14,
+  grid:    0x22d3ee,
+};
+const CSS = {
+  qa:      '#22d3ee',
+  creative:'#c084fc',
+  active:  '#a78bfa',
+  detour:  '#f97316',
+  init:    '#c0c0c0',
+  done:    '#22d3ee',
+  pending: '#4b5563',
+};
 
-  // ── STATE ──
-  let NODES = [];
-  let EDGES = [];
-  let particles = [];
-  let selectedNodeId = null;
-  let hoveredNode = null;
-  let time = 0;
-  let sseConnected = false;
+// ── State ──────────────────────────────────────────────────────────────────
+let graphData = { nodes: [], edges: [] };
+let sessionId = null;
+let selectedNodeId = null;
+let hoveredNodeId = null;
+let sseSource = null;
+let animationId = null;
 
-  const PALETTE = {
-    done:     { fill:'#00ff41', bg:'#0a2a12', text:'#00ff41', glow:'#00ff4130' },
-    active:   { fill:'#facc15', bg:'#2a2206', text:'#facc15', glow:'#facc1530' },
-    pending:  { fill:'#4a5a70', bg:'#141a24', text:'#6a7a8e', glow:'#4a5a7010' },
-    detour:   { fill:'#ff4444', bg:'#2a0a0a', text:'#ff8888', glow:'#ff444425' },
-    resolved: { fill:'#22d3ee', bg:'#0a1a20', text:'#22d3ee', glow:'#22d3ee20' },
-    result:   { fill:'#818cf8', bg:'#1a1040', text:'#a5b4fc', glow:'#818cf840' },
-    cache:    { fill:'#22d3ee', bg:'#0a1a20', text:'#22d3ee', glow:'#22d3ee30' },
-  };
+// camera pan state
+let panX = 0, panZ = 0;
+let targetZoom = 350;
+let currentZoom = 350;
+let isDragging = false;
+let dragStartX = 0, dragStartZ = 0;
+let dragStartMouseX = 0, dragStartMouseY = 0;
 
-  // ── CANVAS SETUP ──
-  const canvas = document.getElementById('graph');
-  const ctx = canvas.getContext('2d');
-  const area = canvas.parentElement;
-  let W, H, scale;
-  let zoom = 1;
-  let panX = 0, panY = 0;
-  let isPanning = false, panStartX = 0, panStartY = 0, panStartPanX = 0, panStartPanY = 0;
+// Three.js objects
+let renderer, scene, camera;
+const nodeMeshes = new Map();  // nodeId -> mesh
+const edgeLines  = new Map();  // edgeId -> line
+const particles  = [];         // {mesh, fromId, toId, t, speed}
+let  clockTime   = 0;
 
-  function resize() {
-    const rect = area.getBoundingClientRect();
-    scale = devicePixelRatio;
-    W = rect.width;
-    H = rect.height;
-    canvas.width = W * scale;
-    canvas.height = H * scale;
-    canvas.style.width = W + 'px';
-    canvas.style.height = H + 'px';
-    ctx.setTransform(scale, 0, 0, scale, 0, 0);
-  }
+// ── Boot ──────────────────────────────────────────────────────────────────
+const wrap        = document.getElementById('canvasWrap');
+const threeCanvas = document.getElementById('three-canvas');
+const labelCanvas = document.getElementById('label-canvas');
+const labelCtx    = labelCanvas.getContext('2d');
+
+initThree();
+fetchSessions();
+fetchGraph();
+connectSSE();
+
+// ── Three.js init ─────────────────────────────────────────────────────────
+function initThree() {
+  renderer = new THREE.WebGLRenderer({ canvas: threeCanvas, antialias: true, alpha: false });
+  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.setClearColor(C.bg, 1);
+
+  scene = new THREE.Scene();
+  scene.fog = new THREE.FogExp2(C.bg, 0.0025);
+
+  camera = new THREE.PerspectiveCamera(45, 1, 1, 5000);
+  camera.position.set(0, 350, 200);
+  camera.lookAt(0, 0, 0);
+
+  // Grid
+  const grid = new THREE.GridHelper(2000, 80, C.grid, C.grid);
+  grid.position.y = -30;
+  grid.material.opacity = 0.03;
+  grid.material.transparent = true;
+  scene.add(grid);
+
+  // Ambient light
+  scene.add(new THREE.AmbientLight(0xffffff, 0.2));
+
   resize();
   window.addEventListener('resize', resize);
+  setupMouseControls();
+  animate();
+}
 
-  // ── POSITION NODES (Server-computed via Dagre) ──
-  // Positions (x, y) come from the server API. This function just sets node radius
-  // and places any nodes that arrived via SSE without positions.
-  function positionNodes() {
-    if (NODES.length === 0) return;
+function resize() {
+  const w = wrap.clientWidth, h = wrap.clientHeight;
+  renderer.setSize(w, h, false);
+  labelCanvas.width  = w * window.devicePixelRatio;
+  labelCanvas.height = h * window.devicePixelRatio;
+  labelCanvas.style.width  = w + 'px';
+  labelCanvas.style.height = h + 'px';
+  labelCtx.scale(window.devicePixelRatio, window.devicePixelRatio);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
 
-    // Build children map for sizing
-    const children = {};
-    EDGES.forEach(e => {
-      if (!children[e.from]) children[e.from] = [];
-      children[e.from].push(e.to);
-    });
+// ── Camera controls (pan + zoom, NO rotation) ─────────────────────────────
+function setupMouseControls() {
+  const el = threeCanvas;
 
-    NODES.forEach(n => {
-      const isResult = n.label === 'RESULT';
-      const isInit = n.label === 'INIT';
-      const isPhase = (children[n.id] || []).length > 1;
-      n.r = isResult ? 32 : isInit ? 34 : isPhase ? 30 : (n.status === 'active' ? 28 : 22);
-
-      // If node has no position (arrived via SSE), place near parent
-      if (n.x === undefined || n.y === undefined) {
-        const parentEdge = EDGES.find(e => e.to === n.id);
-        const parent = parentEdge ? NODES.find(nd => nd.id === parentEdge.from) : null;
-        if (parent && parent.x !== undefined) {
-          n.x = parent.x + 160;
-          n.y = parent.y + (Math.random() - 0.5) * 100;
-        } else {
-          n.x = 200;
-          n.y = 200;
-        }
-      }
-    });
-  }
-
-  // Debounced re-fetch layout from server after graph changes
-  let layoutTimer = null;
-  function scheduleRefetchLayout() {
-    if (layoutTimer) clearTimeout(layoutTimer);
-    layoutTimer = setTimeout(refetchLayout, 300);
-  }
-
-  function refetchLayout() {
-    fetch(graphUrl)
-      .then(r => r.json())
-      .then(data => {
-        const serverNodes = (data.graph || data).nodes || data.nodes || [];
-        // Update positions from server
-        serverNodes.forEach(sn => {
-          const local = NODES.find(n => n.id === sn.id);
-          if (local && sn.x !== undefined) {
-            local.x = sn.x;
-            local.y = sn.y;
-          }
-        });
-        rebuildParticles();
-      })
-      .catch(() => {});
-  }
-
-  function scaleX(x) { return x * zoom + panX; }
-  function scaleY(y) { return y * zoom + panY; }
-  function scaleR(r) { return r * zoom; }
-
-  // ── PARTICLES ──
-  function rebuildParticles() {
-    particles = [];
-    EDGES.forEach(e => {
-      if (e.type === 'pending') return;
-      const from = NODES.find(n => n.id === e.from);
-      const to = NODES.find(n => n.id === e.to);
-      if (!from || !to) return;
-      const count = e.type === 'detour' ? 2 : 3;
-      for (let i = 0; i < count; i++) {
-        particles.push({
-          from, to, edge: e,
-          t: i / count,
-          speed: 0.002 + Math.random() * 0.003,
-        });
-      }
-    });
-  }
-
-  // ── DRAWING ──
-  function getEdgeMidpoint(e) {
-    const from = NODES.find(n => n.id === e.from);
-    const to = NODES.find(n => n.id === e.to);
-    if (!from || !to) return { x: 0, y: 0 };
-    const x1 = scaleX(from.x), y1 = scaleY(from.y);
-    const x2 = scaleX(to.x), y2 = scaleY(to.y);
-    if (e.curve) {
-      const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
-      const dx = x2 - x1, dy = y2 - y1;
-      const len = Math.sqrt(dx*dx + dy*dy) || 1;
-      const nx = -dy/len, ny = dx/len;
-      return { x: mx + nx * e.curve, y: my + ny * e.curve };
-    }
-    return { x: (x1 + x2) / 2, y: (y1 + y2) / 2 };
-  }
-
-  function drawEdge(e) {
-    const from = NODES.find(n => n.id === e.from);
-    const to = NODES.find(n => n.id === e.to);
-    if (!from || !to || from.x === undefined || to.x === undefined) return;
-    const x1 = scaleX(from.x), y1 = scaleY(from.y);
-    const x2 = scaleX(to.x), y2 = scaleY(to.y);
-
-    const pal = e.type === 'detour' ? PALETTE.detour :
-                e.type === 'resolved' ? PALETTE.resolved :
-                e.type === 'pending' ? PALETTE.pending : PALETTE.done;
-
-    ctx.beginPath();
-    ctx.moveTo(x1, y1);
-    if (e.curve) {
-      const mid = getEdgeMidpoint(e);
-      ctx.quadraticCurveTo(mid.x, mid.y, x2, y2);
-    } else {
-      ctx.lineTo(x2, y2);
-    }
-    ctx.strokeStyle = pal.fill;
-    ctx.globalAlpha = e.type === 'pending' ? 0.35 : 0.45;
-    ctx.lineWidth = e.type === 'pending' ? 2 : 2.5;
-    if (e.type === 'pending') ctx.setLineDash([8, 6]);
-    else ctx.setLineDash([]);
-    ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.globalAlpha = 1;
-
-    // Arrow
-    {
-      let dx, dy;
-      if (e.curve) {
-        const mid = getEdgeMidpoint(e);
-        dx = x2 - mid.x;
-        dy = y2 - mid.y;
-      } else {
-        dx = x2 - x1;
-        dy = y2 - y1;
-      }
-      const len = Math.sqrt(dx*dx + dy*dy) || 1;
-      const ux = dx/len, uy = dy/len;
-      const toR = scaleR(to.r);
-      const ax = x2 - ux * (toR + 4), ay = y2 - uy * (toR + 4);
-      const aLen = 14, aWidth = 7;
-      ctx.beginPath();
-      ctx.moveTo(ax, ay);
-      ctx.lineTo(ax - ux * aLen - uy * aWidth, ay - uy * aLen + ux * aWidth);
-      ctx.lineTo(ax - ux * aLen + uy * aWidth, ay - uy * aLen - ux * aWidth);
-      ctx.closePath();
-      ctx.fillStyle = pal.fill;
-      ctx.globalAlpha = e.type === 'pending' ? 0.4 : 0.85;
-      ctx.fill();
-      ctx.globalAlpha = 1;
-    }
-
-    // Label pill
-    const mid = getEdgeMidpoint(e);
-    const lbl = e.label || '';
-    if (lbl) {
-      const lx = mid.x, ly = mid.y - 12;
-      ctx.font = 'bold 13px Inter, system-ui, sans-serif';
-      ctx.textAlign = 'center';
-      const textW = ctx.measureText(lbl).width;
-      {
-        ctx.beginPath();
-        const px = lx - textW/2 - 8, py = ly - 12, pw = textW + 16, ph = 20;
-        ctx.roundRect(px, py, pw, ph, 4);
-        ctx.fillStyle = '#0a0e14';
-        ctx.globalAlpha = 0.85;
-        ctx.fill();
-        ctx.strokeStyle = pal.fill;
-        ctx.lineWidth = 1;
-        ctx.globalAlpha = 0.3;
-        ctx.stroke();
-        ctx.globalAlpha = 1;
-      }
-      ctx.fillStyle = pal.text;
-      ctx.globalAlpha = e.type === 'pending' ? 0.5 : 0.9;
-      ctx.fillText(lbl, lx, ly);
-      ctx.globalAlpha = 1;
-    }
-  }
-
-  function drawNode(n) {
-    if (n.x === undefined) return;
-    const x = scaleX(n.x), y = scaleY(n.y), r = scaleR(n.r);
-    const isResult = n.label === 'RESULT';
-    const isCache = n.label === 'CACHED';
-    const pal = isCache ? PALETTE.cache : isResult ? PALETTE.result : (PALETTE[n.status] || PALETTE.pending);
-    const isActive = n.status === 'active';
-    const isHovered = hoveredNode === n;
-
-    // Glow
-    if (n.status !== 'pending') {
-      const glowR = isActive ? r * 2.5 + Math.sin(time * 2) * 5 : (isHovered ? r * 2 : r * 1.6);
-      const grad = ctx.createRadialGradient(x, y, r * 0.5, x, y, glowR);
-      grad.addColorStop(0, pal.glow);
-      grad.addColorStop(1, 'transparent');
-      ctx.beginPath();
-      ctx.arc(x, y, glowR, 0, Math.PI * 2);
-      ctx.fillStyle = grad;
-      ctx.fill();
-    }
-
-    // Background circle
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.fillStyle = pal.bg;
-    ctx.fill();
-    ctx.strokeStyle = pal.fill;
-    ctx.lineWidth = isActive ? 3 : 2;
-    if (n.status === 'pending') ctx.setLineDash([5, 5]);
-    else ctx.setLineDash([]);
-    ctx.globalAlpha = n.status === 'pending' ? 0.5 : (isActive ? 0.7 + Math.sin(time * 3) * 0.3 : 0.9);
-    ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.globalAlpha = 1;
-
-    // Active: spinning rings + "AI IS HERE"
-    if (isActive) {
-      ctx.beginPath();
-      ctx.arc(x, y, r + 18, 0, Math.PI * 2);
-      ctx.strokeStyle = pal.fill;
-      ctx.lineWidth = 1.5;
-      ctx.globalAlpha = 0.12 + Math.sin(time * 1.5) * 0.06;
-      ctx.setLineDash([3, 5]);
-      ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.globalAlpha = 1;
-
-      ctx.beginPath();
-      ctx.arc(x, y, r + 12, time * 0.5, time * 0.5 + Math.PI * 1.4);
-      ctx.strokeStyle = pal.fill;
-      ctx.lineWidth = 2.5;
-      ctx.globalAlpha = 0.35;
-      ctx.stroke();
-      ctx.globalAlpha = 1;
-
-      ctx.beginPath();
-      ctx.arc(x, y, r + 6, -time * 0.4, -time * 0.4 + Math.PI * 1);
-      ctx.strokeStyle = pal.fill;
-      ctx.lineWidth = 2;
-      ctx.globalAlpha = 0.5;
-      ctx.stroke();
-      ctx.globalAlpha = 1;
-
-      const labelY = y - r - 26;
-      ctx.font = 'bold 11px Inter, system-ui, sans-serif';
-      ctx.textAlign = 'center';
-      const sid = n._sessionId ? (' #' + n._sessionId.slice(0, 4)) : '';
-      const hereText = '\\u26A1 AI' + sid + ' HERE';
-      const tw = ctx.measureText(hereText).width;
-      ctx.beginPath();
-      ctx.roundRect(x - tw/2 - 10, labelY - 10, tw + 20, 22, 11);
-      ctx.fillStyle = pal.fill;
-      ctx.globalAlpha = 0.85 + Math.sin(time * 2) * 0.15;
-      ctx.fill();
-      ctx.globalAlpha = 1;
-      ctx.fillStyle = '#0a0e14';
-      ctx.fillText(hereText, x, labelY + 4);
-    }
-
-    // Label
-    ctx.font = 'bold ' + Math.max(13, r * 0.5) + 'px Inter, system-ui, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillStyle = pal.text;
-    ctx.globalAlpha = n.status === 'pending' ? 0.55 : 1;
-    const rawLabel = (n.label || n.id || '').toUpperCase();
-    const maxChars = Math.max(6, Math.floor(r / 4));
-    const label = rawLabel.length > maxChars ? rawLabel.slice(0, maxChars - 1) + '\\u2026' : rawLabel;
-    ctx.fillText(label, x, y - (n.status === 'done' || isActive ? 4 : 0));
-
-    // Status text
-    if (n.status !== 'pending') {
-      const stText = isActive ? 'working...' : n.status === 'done' ? 'done \\u2713' : n.status === 'detour' ? 'patched' : '';
-      ctx.font = '10px Inter, system-ui, sans-serif';
-      ctx.globalAlpha = 0.6;
-      ctx.fillText(stText, x, y + 10);
-    }
-    ctx.globalAlpha = 1;
-  }
-
-  function drawParticles() {
-    particles.forEach(p => {
-      if (!p.from || !p.to || p.from.x === undefined || p.to.x === undefined) return;
-      p.t = (p.t + p.speed) % 1;
-      const x1 = scaleX(p.from.x), y1 = scaleY(p.from.y);
-      const x2 = scaleX(p.to.x), y2 = scaleY(p.to.y);
-      let x, y;
-      if (p.edge.curve) {
-        const mid = getEdgeMidpoint(p.edge);
-        const t = p.t, mt = 1 - t;
-        x = mt*mt*x1 + 2*mt*t*mid.x + t*t*x2;
-        y = mt*mt*y1 + 2*mt*t*mid.y + t*t*y2;
-      } else {
-        x = x1 + (x2 - x1) * p.t;
-        y = y1 + (y2 - y1) * p.t;
-      }
-      const fade = Math.sin(p.t * Math.PI);
-      const pal = p.edge.type === 'detour' ? PALETTE.detour :
-                  p.edge.type === 'resolved' ? PALETTE.resolved : PALETTE.done;
-
-      const grad = ctx.createRadialGradient(x, y, 0, x, y, 8);
-      grad.addColorStop(0, pal.fill);
-      grad.addColorStop(1, 'transparent');
-      ctx.beginPath();
-      ctx.arc(x, y, 8, 0, Math.PI * 2);
-      ctx.fillStyle = grad;
-      ctx.globalAlpha = fade * 0.2;
-      ctx.fill();
-
-      ctx.beginPath();
-      ctx.arc(x, y, 3, 0, Math.PI * 2);
-      ctx.fillStyle = pal.fill;
-      ctx.globalAlpha = fade * 0.8;
-      ctx.fill();
-      ctx.globalAlpha = 1;
-    });
-  }
-
-  function draw() {
-    time += 0.02;
-    ctx.clearRect(0, 0, W, H);
-
-    // Background grid
-    ctx.strokeStyle = '#1a2030';
-    ctx.lineWidth = 0.5;
-    ctx.globalAlpha = 0.3;
-    for (let gx = 0; gx < W; gx += 60) {
-      ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, H); ctx.stroke();
-    }
-    for (let gy = 0; gy < H; gy += 60) {
-      ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(W, gy); ctx.stroke();
-    }
-    ctx.globalAlpha = 1;
-
-    EDGES.forEach(drawEdge);
-    drawParticles();
-    NODES.forEach(drawNode);
-
-    requestAnimationFrame(draw);
-  }
-  draw();
-
-  // ── STEP LIST RENDERING ──
-  function renderSteps() {
-    const sorted = [...NODES].sort((a, b) => (a.order || 0) - (b.order || 0));
-    const list = document.getElementById('steps-list');
-    if (!list) return;
-
-    let html = '';
-    let mainIndex = 0;
-    const doneCount = sorted.filter(n => n.status === 'done').length;
-    const total = sorted.filter(n => n.status !== 'detour').length;
-    const pct = total > 0 ? Math.round((doneCount / total) * 100) : 0;
-
-    sorted.forEach((n, i) => {
-      const isDetour = n.status === 'detour';
-      const isResult = n.label === 'RESULT';
-      if (!isDetour) mainIndex++;
-      const statusClass = isResult ? 'step-result' : ('step-' + n.status);
-      const marker = isResult ? '\\u2605' :
-                     n.status === 'done' ? '\\u2713' :
-                     n.status === 'active' ? mainIndex :
-                     n.status === 'detour' ? '!' : mainIndex;
-
-      // Connector before this step (except first)
-      if (i > 0) {
-        const prevDone = sorted[i-1].status === 'done';
-        html += '<div class="step-connector ' + (prevDone ? 'step-connector-done' : '') + '"></div>';
-      }
-
-      const desc = n.layman ? (n.layman.length > 40 ? n.layman.slice(0, 40).replace(/<[^>]*>/g,'') + '...' : n.layman.replace(/<[^>]*>/g,'')) :
-                   n.status === 'active' ? 'Working...' :
-                   n.status === 'done' ? 'Completed' :
-                   n.status === 'detour' ? 'Detour' : 'Waiting';
-
-      html += '<div class="step ' + statusClass + (isDetour ? ' step-detour' : '') + '" data-node-id="' + n.id + '">'
-            + '<div class="step-marker">' + marker + '</div>'
-            + '<div class="step-content">'
-            + '<div class="step-name">' + (n.label || n.id) + '</div>'
-            + '<div class="step-desc">' + desc + '</div>'
-            + '</div></div>';
-    });
-
-    list.innerHTML = html;
-
-    // Update progress
-    const pctEl = document.getElementById('progress-pct');
-    const fillEl = document.getElementById('progress-fill');
-    if (pctEl) pctEl.textContent = pct + '%';
-    if (fillEl) fillEl.style.width = pct + '%';
-
-    // Stats bar
-    const statsEl = document.getElementById('stats-bar');
-    const detourCount = NODES.filter(n => n.status === 'detour').length;
-    if (statsEl) statsEl.textContent = NODES.length + ' nodes \\u00B7 ' + EDGES.length + ' edges \\u00B7 ' + detourCount + ' detour' + (detourCount !== 1 ? 's' : '');
-
-    // Click handlers on steps
-    list.querySelectorAll('.step').forEach(el => {
-      el.addEventListener('click', () => {
-        const nodeId = el.getAttribute('data-node-id');
-        if (nodeId) {
-          selectedNodeId = nodeId;
-          renderPanel(nodeId);
-          document.getElementById('detail-panel').scrollTop = 0;
-        }
-      });
-    });
-
-    // Auto-scroll to active step
-    const activeEl = list.querySelector('.step-active');
-    if (activeEl) activeEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }
-
-  // ── DETAIL PANEL ──
-  function renderPanel(nodeId) {
-    const n = NODES.find(nd => nd.id === nodeId);
-    if (!n) return;
-    const isResult = n.label === 'RESULT';
-    const pal = isResult ? PALETTE.result : (PALETTE[n.status] || PALETTE.pending);
-    const panelEl = document.getElementById('panel-content');
-    if (!panelEl) return;
-
-    const sorted = [...NODES].filter(nd => nd.status !== 'detour').sort((a, b) => (a.order||0) - (b.order||0));
-    const stepIdx = sorted.findIndex(nd => nd.id === nodeId);
-    const stepText = n.status === 'detour' ? 'detour' : ((stepIdx + 1) + ' of ' + sorted.length);
-    const statusText = n.status === 'active' ? 'in progress' :
-                       n.status === 'done' ? 'completed' :
-                       n.status === 'detour' ? 'patched' : 'waiting';
-
-    const icon = n.status === 'active' ? '\\u26A1' :
-                 n.status === 'done' ? '\\u2713' :
-                 n.status === 'detour' ? '!' : '\\u2022';
-
-    let html = '<div class="dp-header">'
-      + '<div class="dp-icon" style="background:' + pal.fill + ';' + (n.status==='pending'?'opacity:0.3;':'') + '">' + icon + '</div>'
-      + '<div>'
-      + '<div class="dp-title" style="color:' + pal.text + '">' + (n.label || n.id) + '</div>'
-      + '<div class="dp-subtitle">Step ' + stepText + ' \\u2014 ' + statusText + '</div>'
-      + '</div></div>';
-
-    html += '<div class="dp-row">';
-
-    // Column 1: Description
-    html += '<div class="dp-col">';
-    if (n.layman) {
-      html += '<div class="dp-section"><div class="dp-layman">'
-        + '<div class="dp-layman-title" style="color:' + pal.fill + '">In plain words</div>'
-        + n.layman
-        + '</div></div>';
-    }
-    if (n.cause || n.expect) {
-      if (n.cause) html += '<div class="dp-cause"><b>Because:</b> ' + n.cause + '</div>';
-      if (n.expect) html += '<div class="dp-expect" style="margin-top:6px"><b>Expected:</b> ' + n.expect + '</div>';
-    }
-    if (n.techDetails) {
-      html += '<div class="dp-section" style="margin-top:8px">'
-        + '<div class="dp-label">Technical details</div>'
-        + '<div class="dp-value" style="font-size:12px">' + n.techDetails + '</div>'
-        + '</div>';
-    }
-    html += '</div>';
-
-    // Column 2: Activity log
-    html += '<div class="dp-col">';
-    if (n.activity && n.activity.length > 0) {
-      html += '<div class="dp-label">Live Activity <span class="typing-indicator"><span></span><span></span><span></span></span></div>';
-      n.activity.forEach(a => {
-        const isNew = a.isNew || false;
-        const isBug = a.isBug || false;
-        html += '<div class="dp-log-line ' + (isNew ? 'dp-log-new' : '') + '">'
-          + '<span class="dp-log-time">' + (a.time || '') + '</span>'
-          + '<span ' + (isBug ? 'style="color:#ff8888"' : 'class="dp-log-action"') + '>' + (a.action || '') + '</span> '
-          + (a.text || '')
-          + (a.dim ? ' <span class="dp-dim">' + a.dim + '</span>' : '')
-          + '</div>';
-      });
-    } else {
-      html += '<div class="dp-label">Activity</div><div style="color:#4a5568;font-size:12px">No activity yet</div>';
-    }
-    html += '</div>';
-
-    html += '</div>'; // close dp-row
-
-    panelEl.innerHTML = html;
-  }
-
-  // ── INTERACTION: Hover / Click on Canvas ──
-  canvas.addEventListener('mousemove', function(e) {
-    const rect = canvas.getBoundingClientRect();
-    const mx = e.clientX - rect.left;
-    const my = e.clientY - rect.top;
-    const tt = document.getElementById('tooltip');
-    hoveredNode = null;
-
-    for (const n of NODES) {
-      if (n.x === undefined) continue;
-      const nx = scaleX(n.x), ny = scaleY(n.y), nr = scaleR(n.r);
-      const dx = mx - nx, dy = my - ny;
-      if (dx*dx + dy*dy < nr*nr) {
-        hoveredNode = n;
-        const isResultNode = n.label === 'RESULT';
-        const pal = isResultNode ? PALETTE.result : (PALETTE[n.status] || PALETTE.pending);
-        tt.querySelector('.tt-name').textContent = (n.label || n.id);
-        tt.querySelector('.tt-name').style.color = pal.text;
-        tt.querySelector('.tt-desc').textContent = n.layman ? n.layman.replace(/<[^>]*>/g, '').slice(0, 120) : (n.desc || '');
-        tt.querySelector('.tt-status').textContent = '\\u25CF ' + (n.status || '').toUpperCase();
-        tt.querySelector('.tt-status').style.color = pal.fill;
-        tt.style.display = 'block';
-        tt.style.left = (e.clientX + 15) + 'px';
-        tt.style.top = (e.clientY + 15) + 'px';
-        canvas.style.cursor = 'pointer';
-        return;
-      }
-    }
-    tt.style.display = 'none';
-    canvas.style.cursor = 'grab';
+  el.addEventListener('mousedown', e => {
+    if (e.button !== 0) return;
+    isDragging = true;
+    dragStartMouseX = e.clientX;
+    dragStartMouseY = e.clientY;
+    dragStartX = panX;
+    dragStartZ = panZ;
+    el.style.cursor = 'grabbing';
   });
 
-  canvas.addEventListener('click', function(e) {
-    const rect = canvas.getBoundingClientRect();
-    const mx = e.clientX - rect.left;
-    const my = e.clientY - rect.top;
+  window.addEventListener('mouseup', () => {
+    isDragging = false;
+    el.style.cursor = 'grab';
+  });
 
-    for (const n of NODES) {
-      if (n.x === undefined) continue;
-      const nx = scaleX(n.x), ny = scaleY(n.y), nr = scaleR(n.r);
-      const dx = mx - nx, dy = my - ny;
-      if (dx*dx + dy*dy < nr*nr) {
-        selectedNodeId = n.id;
-        renderPanel(n.id);
-        document.getElementById('detail-panel').scrollTop = 0;
-        return;
-      }
+  window.addEventListener('mousemove', e => {
+    if (isDragging) {
+      const dx = e.clientX - dragStartMouseX;
+      const dy = e.clientY - dragStartMouseY;
+      panX = dragStartX - dx * 0.3;
+      panZ = dragStartZ - dy * 0.3;
+      updateCamera();
+      return;
     }
+    handleHover(e);
   });
 
-  canvas.addEventListener('mouseleave', function() {
-    document.getElementById('tooltip').style.display = 'none';
-    hoveredNode = null;
-  });
-
-  // ── ZOOM & PAN ──
-  canvas.addEventListener('wheel', function(e) {
+  el.addEventListener('wheel', e => {
     e.preventDefault();
-    const rect = canvas.getBoundingClientRect();
-    const mx = e.clientX - rect.left;
-    const my = e.clientY - rect.top;
-    const oldZoom = zoom;
-    const delta = e.deltaY > 0 ? 0.9 : 1.1;
-    zoom = Math.max(0.3, Math.min(5, zoom * delta));
-    // Zoom toward cursor
-    panX = mx - (mx - panX) * (zoom / oldZoom);
-    panY = my - (my - panY) * (zoom / oldZoom);
+    targetZoom = Math.max(100, Math.min(800, targetZoom + e.deltaY * 0.5));
   }, { passive: false });
 
-  canvas.addEventListener('mousedown', function(e) {
-    if (e.button === 0) {
-      // Check if clicking on a node — if so, don't pan
-      const rect = canvas.getBoundingClientRect();
-      const mx = e.clientX - rect.left;
-      const my = e.clientY - rect.top;
-      let onNode = false;
-      for (const n of NODES) {
-        if (n.x === undefined) continue;
-        const nx = scaleX(n.x), ny = scaleY(n.y), nr = scaleR(n.r);
-        const dx = mx - nx, dy = my - ny;
-        if (dx*dx + dy*dy < nr*nr) { onNode = true; break; }
+  el.style.cursor = 'grab';
+}
+
+function updateCamera() {
+  camera.position.set(panX * 0.3, currentZoom, panZ * 0.3 + 200);
+  camera.lookAt(panX * 0.3, 0, panZ * 0.3);
+}
+
+// ── Client-side radial layout (for SSE-received nodes without positions) ──
+function computeClientLayout(nodes, edges) {
+  if (nodes.length === 0) return;
+
+  const children = new Map();
+  for (const e of edges) {
+    if (!children.has(e.from)) children.set(e.from, []);
+    children.get(e.from).push(e.to);
+  }
+
+  const root = nodes.find(n => n.label === 'INIT') || nodes[0];
+  if (root.x == null) { root.x = 0; root.y = 0; root.z = 0; }
+
+  const positioned = new Set();
+  // Keep nodes that already have positions
+  for (const n of nodes) {
+    if (n.x != null && n.y != null && n.z != null) positioned.add(n.id);
+  }
+  if (!positioned.has(root.id)) positioned.add(root.id);
+
+  const nodeMap = new Map(nodes.map(n => [n.id, n]));
+  const allRootChildren = children.get(root.id) || [];
+  // If only 1 branch from root, spread its sub-steps in an arc instead of a line
+  const angleStep = allRootChildren.length > 1
+    ? (2 * Math.PI) / allRootChildren.length
+    : Math.PI / 3; // 60 degree arc for single branch
+
+  let seed = 42;
+  const rand = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
+
+  allRootChildren.forEach((childId, i) => {
+    const baseAngle = allRootChildren.length > 1
+      ? angleStep * i
+      : -Math.PI / 6; // start single branch slightly left
+    const queue = [{ id: childId, depth: 1, angle: baseAngle }];
+
+    while (queue.length > 0) {
+      const cur = queue.shift();
+      const node = nodeMap.get(cur.id);
+      if (!node || positioned.has(cur.id)) {
+        if (node) {
+          const ch = children.get(cur.id) || [];
+          ch.forEach((cid, j) => {
+            // Wider spread for branching: each child gets a distinct angle offset
+            const spread = ch.length > 1 ? 0.8 : 0.4;
+            const subAngle = cur.angle + (j - (ch.length - 1) / 2) * spread;
+            queue.push({ id: cid, depth: cur.depth + 1, angle: subAngle });
+          });
+        }
+        continue;
       }
-      if (!onNode) {
-        isPanning = true;
-        panStartX = e.clientX;
-        panStartY = e.clientY;
-        panStartPanX = panX;
-        panStartPanY = panY;
-        canvas.style.cursor = 'grabbing';
-        e.preventDefault();
+      positioned.add(cur.id);
+
+      const dist = cur.depth * 80;
+      // Add progressive angle offset per depth to create an arc, not a line
+      const arcOffset = (allRootChildren.length <= 1) ? cur.depth * 0.15 : 0;
+      const finalAngle = cur.angle + arcOffset;
+
+      node.x = Math.cos(finalAngle) * dist + (rand() - 0.5) * 30;
+      node.y = (rand() - 0.5) * 20;
+      node.z = Math.sin(finalAngle) * dist + (rand() - 0.5) * 30;
+
+      const ch = children.get(cur.id) || [];
+      ch.forEach((cid, j) => {
+        const spread = ch.length > 1 ? 0.8 : 0.4;
+        const subAngle = finalAngle + (j - (ch.length - 1) / 2) * spread;
+        queue.push({ id: cid, depth: cur.depth + 1, angle: subAngle });
+      });
+    }
+  });
+
+  // Position any remaining unpositioned nodes near their parent
+  for (const n of nodes) {
+    if (!positioned.has(n.id)) {
+      // Find parent from edges
+      const parentEdge = edges.find(e => e.to === n.id);
+      const parent = parentEdge ? nodeMap.get(parentEdge.from) : null;
+      if (parent && parent.x != null) {
+        n.x = parent.x + (rand() - 0.5) * 60;
+        n.y = (parent.y || 0) + (rand() - 0.5) * 20;
+        n.z = (parent.z || 0) + (rand() - 0.5) * 60;
+      } else {
+        n.x = (rand() - 0.5) * 100;
+        n.y = (rand() - 0.5) * 30;
+        n.z = (rand() - 0.5) * 100;
       }
+      positioned.add(n.id);
     }
-  });
+  }
+}
 
-  window.addEventListener('mousemove', function(e) {
-    if (!isPanning) return;
-    panX = panStartPanX + (e.clientX - panStartX);
-    panY = panStartPanY + (e.clientY - panStartY);
-  });
+// ── Scene build ────────────────────────────────────────────────────────────
+function buildScene() {
+  // Remove old nodes/edges/particles
+  for (const m of nodeMeshes.values()) {
+    if (m._light) scene.remove(m._light);
+    scene.remove(m);
+  }
+  nodeMeshes.clear();
+  for (const l of edgeLines.values()) scene.remove(l);
+  edgeLines.clear();
+  for (const p of particles) scene.remove(p.mesh);
+  particles.length = 0;
 
-  window.addEventListener('mouseup', function() {
-    if (isPanning) {
-      isPanning = false;
-      canvas.style.cursor = 'grab';
+  const { nodes, edges } = graphData;
+
+  // Determine session type for color
+  const sessionColor = (sessionId && sessionId.includes('creative')) ? C.creative : C.qa;
+
+  // Build nodes
+  for (const node of nodes) {
+    const type = node.label === 'INIT'   ? 'init'
+               : node.label === 'RESULT' ? 'result'
+               : node.label === 'TOOL'   ? 'tool'
+               : 'step';
+
+    const radius = type === 'init'   ? 6
+                 : type === 'result' ? 4.5
+                 : type === 'tool'   ? 2
+                 : 3;
+
+    const geo  = new THREE.SphereGeometry(radius, 16, 12);
+    const color = node.status === 'detour' ? C.detour
+                : node.label === 'INIT'    ? C.init
+                : node.status === 'active' ? C.active
+                : sessionColor;
+    const opacity = node.status === 'done'    ? 0.85
+                  : node.status === 'active'  ? 1.0
+                  : node.status === 'detour'  ? 0.9
+                  : 0.7;
+
+    const mat = new THREE.MeshStandardMaterial({
+      color,
+      emissive: color,
+      emissiveIntensity: node.status === 'active' ? 0.6 : 0.2,
+      transparent: true,
+      opacity,
+      roughness: 0.3,
+      metalness: 0.4,
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(node.x ?? 0, node.y ?? 0, node.z ?? 0);
+    mesh._nodeId   = node.id;
+    mesh._baseY    = node.y ?? 0;
+    mesh._baseScale = 1;
+    mesh._status   = node.status;
+    mesh._isActive = node.status === 'active';
+
+    // Point light for special nodes
+    if (type === 'init' || type === 'result' || node.status === 'active') {
+      const light = new THREE.PointLight(color, node.status === 'active' ? 1.2 : 0.6, 120);
+      light.position.copy(mesh.position);
+      scene.add(light);
+      mesh._light = light;
     }
-  });
 
-  document.getElementById('zoom-in').addEventListener('click', function() {
-    const cx = W / 2, cy = H / 2;
-    const oldZoom = zoom;
-    zoom = Math.min(5, zoom * 1.3);
-    panX = cx - (cx - panX) * (zoom / oldZoom);
-    panY = cy - (cy - panY) * (zoom / oldZoom);
-  });
+    scene.add(mesh);
+    nodeMeshes.set(node.id, mesh);
+  }
 
-  document.getElementById('zoom-out').addEventListener('click', function() {
-    const cx = W / 2, cy = H / 2;
-    const oldZoom = zoom;
-    zoom = Math.max(0.3, zoom * 0.7);
-    panX = cx - (cx - panX) * (zoom / oldZoom);
-    panY = cy - (cy - panY) * (zoom / oldZoom);
-  });
+  // Build edges + particles
+  for (const edge of edges) {
+    const fromNode = nodes.find(n => n.id === edge.from);
+    const toNode   = nodes.find(n => n.id === edge.to);
+    if (!fromNode || !toNode) continue;
 
-  document.getElementById('zoom-reset').addEventListener('click', function() {
-    zoom = 1;
-    panX = 0;
-    panY = 0;
-  });
+    const pts = [
+      new THREE.Vector3(fromNode.x ?? 0, fromNode.y ?? 0, fromNode.z ?? 0),
+      new THREE.Vector3(toNode.x   ?? 0, toNode.y   ?? 0, toNode.z   ?? 0),
+    ];
+    const geo  = new THREE.BufferGeometry().setFromPoints(pts);
+    const mat  = new THREE.LineBasicMaterial({
+      color: edge.type === 'detour' ? C.detour : sessionColor,
+      transparent: true,
+      opacity: 0.4,
+    });
+    const line = new THREE.Line(geo, mat);
+    scene.add(line);
+    edgeLines.set(edge.id, line);
 
-  // ── RESIZE HANDLE ──
-  const handle = document.getElementById('resize-handle');
-  const layout = document.querySelector('.layout');
-  let dragging = false;
+    // Particle along edge
+    const pGeo = new THREE.SphereGeometry(1.2, 8, 6);
+    const pMat = new THREE.MeshBasicMaterial({
+      color: edge.type === 'detour' ? C.detour : sessionColor,
+      transparent: true,
+      opacity: 0.8,
+    });
+    const pMesh = new THREE.Mesh(pGeo, pMat);
+    scene.add(pMesh);
+    particles.push({
+      mesh:   pMesh,
+      fromId: edge.from,
+      toId:   edge.to,
+      t:      Math.random(),
+      speed:  0.002 + Math.random() * 0.003,
+    });
+  }
 
-  handle.addEventListener('mousedown', function(e) {
-    dragging = true;
-    handle.classList.add('dragging');
-    e.preventDefault();
-  });
+  updateStepsPanel();
+  updateNodeCount();
+}
 
-  window.addEventListener('mousemove', function(e) {
-    if (!dragging) return;
-    const newHeight = window.innerHeight - e.clientY;
-    const clamped = Math.max(120, Math.min(400, newHeight));
-    layout.style.setProperty('--panel-height', clamped + 'px');
-    resize();
-  });
+// ── Animation loop ─────────────────────────────────────────────────────────
+function animate() {
+  animationId = requestAnimationFrame(animate);
+  clockTime += 0.016;
 
-  window.addEventListener('mouseup', function() {
-    dragging = false;
-    handle.classList.remove('dragging');
-  });
+  // Smooth zoom lerp
+  currentZoom += (targetZoom - currentZoom) * 0.08;
+  camera.position.y = currentZoom;
 
-  // ── LOAD DATA ──
-  function applyGraphData(graph) {
-    if (graph.nodes) {
-      NODES = graph.nodes.map(n => ({
-        ...n,
-        label: n.label || n.id,
-        status: n.status || 'pending',
-        order: n.order || 0,
-      }));
+  // Float animation + active pulse
+  for (const [id, mesh] of nodeMeshes) {
+    const floatY = mesh._baseY + Math.sin(clockTime + mesh.position.x * 0.1) * 1.5;
+    mesh.position.y = floatY;
+    if (mesh._light) {
+      mesh._light.position.y = floatY;
     }
-    if (graph.edges) {
-      EDGES = graph.edges.map(e => ({
-        ...e,
-        from: e.from || e.source,
-        to: e.to || e.target,
-      }));
+    if (mesh._isActive) {
+      const pulse = 0.6 + Math.abs(Math.sin(clockTime * 2)) * 0.5;
+      mesh.material.emissiveIntensity = pulse;
+      if (mesh._light) mesh._light.intensity = pulse * 1.5;
+      const s = 1 + Math.abs(Math.sin(clockTime * 1.5)) * 0.08;
+      mesh.scale.setScalar(s);
     }
-    positionNodes();
-    rebuildParticles();
-    renderSteps();
-    // Auto-select first active node or first node
-    if (!selectedNodeId) {
-      const active = NODES.find(n => n.status === 'active');
-      if (active) {
-        selectedNodeId = active.id;
-        renderPanel(active.id);
-      } else if (NODES.length > 0) {
-        selectedNodeId = NODES[0].id;
-        renderPanel(NODES[0].id);
-      }
+    if (id === hoveredNodeId) {
+      mesh.scale.setScalar(mesh._isActive ? 1.4 + Math.abs(Math.sin(clockTime * 1.5)) * 0.08 : 1.4);
+    } else if (!mesh._isActive) {
+      mesh.scale.setScalar(1);
     }
   }
 
-  const graphUrl = isAllMode ? '/api/graph' : ('/api/graph/' + sessionId);
-  fetch(graphUrl)
-    .then(r => r.json())
-    .then(data => {
-      applyGraphData(isAllMode ? data : data);
-    })
-    .catch(() => {
-      // No graph yet, wait for SSE
-    });
-
-  fetch('/api/sessions').then(r => r.json()).then(data => {
-    const el = document.getElementById('session-count');
-    if (el) el.textContent = (data.sessions?.length ?? 0) + ' sessions';
-  }).catch(() => {});
-
-  // ── SSE ──
-  function connectSSE() {
-    const eventsUrl = isAllMode ? '/api/events' : ('/api/events?sessionId=' + sessionId);
-    const es = new EventSource(eventsUrl);
-    es.onopen = function() {
-      sseConnected = true;
-      const badge = document.getElementById('live-badge');
-      if (badge) { badge.textContent = 'LIVE'; badge.classList.remove('disconnected'); }
-    };
-    es.onerror = function() {
-      sseConnected = false;
-      const badge = document.getElementById('live-badge');
-      if (badge) { badge.textContent = 'RECONNECTING'; badge.classList.add('disconnected'); }
-    };
-
-    es.addEventListener('graph:full', function(e) {
-      try {
-        const data = JSON.parse(e.data);
-        if (isAllMode) {
-          // In all-mode, graph:full is per-session — merge into existing graph
-          const g = data.graph || data;
-          if (g.nodes) {
-            let sessionInitId = null;
-            g.nodes.forEach(n => {
-              if (n.label === 'INIT') { sessionInitId = n.id; return; }
-              const existing = NODES.findIndex(nd => nd.id === n.id);
-              if (existing >= 0) NODES[existing] = { ...NODES[existing], ...n };
-              else NODES.push({ ...n, label: n.label || n.id, status: n.status || 'pending', order: n.order || 0 });
-            });
-            // Ensure central INIT exists
-            if (!NODES.find(n => n.id === '__init__')) {
-              NODES.unshift({ id: '__init__', label: 'INIT', status: 'done', order: 0, layman: 'Central hub — all sessions branch from here.', cause: '', expect: '', techDetails: null, activity: [] });
-            }
-            if (g.edges) {
-              g.edges.forEach(edge => {
-                const from = edge.from === sessionInitId ? '__init__' : edge.from;
-                const to = edge.to === sessionInitId ? '__init__' : edge.to;
-                if (!EDGES.find(ex => ex.from === from && ex.to === to)) {
-                  EDGES.push({ ...edge, from, to });
-                }
-              });
-            }
-          }
-          positionNodes();
-          rebuildParticles();
-          renderSteps();
-        } else {
-          applyGraphData(data.graph || data);
-        }
-      } catch(err) {}
-    });
-
-    es.addEventListener('node:added', function(e) {
-      try {
-        const data = JSON.parse(e.data);
-        const node = data.node || data;
-        // In all-mode, skip per-session INIT nodes (we use central __init__)
-        if (isAllMode && node.label === 'INIT') return;
-        // Attach sessionId from SSE event data
-        const sessionTag = data.sessionId || node.sessionId || node._sessionId;
-        const existing = NODES.findIndex(n => n.id === node.id);
-        if (existing >= 0) NODES[existing] = { ...NODES[existing], ...node, _sessionId: sessionTag };
-        else NODES.push({ ...node, label: node.label || node.id, status: node.status || 'pending', order: node.order || 0, _sessionId: sessionTag });
-        positionNodes();
-        rebuildParticles();
-        renderSteps();
-        scheduleRefetchLayout();
-        if (selectedNodeId === node.id) renderPanel(node.id);
-      } catch(err) {}
-    });
-
-    es.addEventListener('node:updated', function(e) {
-      try {
-        const raw = JSON.parse(e.data);
-        const data = raw.patch ? { id: raw.nodeId, ...raw.patch } : raw;
-        const node = NODES.find(n => n.id === data.id);
-        if (node) {
-          Object.assign(node, data);
-          positionNodes();
-          rebuildParticles();
-          renderSteps();
-          if (selectedNodeId === data.id) renderPanel(data.id);
-        }
-      } catch(err) {}
-    });
-
-    es.addEventListener('edge:added', function(e) {
-      try {
-        const data = JSON.parse(e.data);
-        const edge = data.edge || data;
-        let from = edge.from || edge.source;
-        let to = edge.to || edge.target;
-        // In all-mode, remap edges from per-session INIT to central __init__
-        if (isAllMode) {
-          if (!NODES.find(n => n.id === from)) from = '__init__';
-          if (!NODES.find(n => n.id === to)) to = '__init__';
-        }
-        if (!EDGES.find(ex => ex.from === from && ex.to === to)) {
-          EDGES.push({ ...edge, from, to });
-        }
-        rebuildParticles();
-        renderSteps();
-        scheduleRefetchLayout();
-      } catch(err) {}
-    });
-
-    es.addEventListener('activity', function(e) {
-      try {
-        const raw = JSON.parse(e.data);
-        const data = { nodeId: raw.nodeId, entry: raw.entry || raw };
-        const node = NODES.find(n => n.id === data.nodeId);
-        if (node) {
-          if (!node.activity) node.activity = [];
-          node.activity.push(data.entry);
-          if (selectedNodeId === data.nodeId) renderPanel(data.nodeId);
-        }
-      } catch(err) {}
-    });
-
-    es.addEventListener('progress', function(e) {
-      try {
-        const data = JSON.parse(e.data);
-        const pctEl = document.getElementById('progress-pct');
-        const fillEl = document.getElementById('progress-fill');
-        const pct = data.progress ?? data.percent;
-        if (pct !== undefined) {
-          if (pctEl) pctEl.textContent = pct + '%';
-          if (fillEl) fillEl.style.width = pct + '%';
-        }
-      } catch(err) {}
-    });
-
-    // Generic message handler for unnamed events
-    es.onmessage = function(e) {
-      try {
-        const data = JSON.parse(e.data);
-        if (data.type === 'graph:full') applyGraphData(data);
-      } catch(err) {}
-    };
+  // Particle travel
+  const nodes = graphData.nodes;
+  for (const p of particles) {
+    p.t = (p.t + p.speed) % 1;
+    const from = nodes.find(n => n.id === p.fromId);
+    const to   = nodes.find(n => n.id === p.toId);
+    if (from && to) {
+      p.mesh.position.lerpVectors(
+        new THREE.Vector3(from.x ?? 0, from.y ?? 0, from.z ?? 0),
+        new THREE.Vector3(to.x   ?? 0, to.y   ?? 0, to.z   ?? 0),
+        p.t
+      );
+    }
   }
 
-  connectSSE();
+  renderer.render(scene, camera);
+  drawLabels();
+}
+
+// ── Label overlay ──────────────────────────────────────────────────────────
+function drawLabels() {
+  const w = wrap.clientWidth, h = wrap.clientHeight;
+  labelCtx.clearRect(0, 0, w, h);
+  labelCtx.font = 'bold 10px JetBrains Mono, monospace';
+
+  for (const node of graphData.nodes) {
+    const mesh = nodeMeshes.get(node.id);
+    if (!mesh) continue;
+
+    const worldPos = mesh.position.clone();
+    worldPos.project(camera);
+    const sx = (worldPos.x  *  0.5 + 0.5) * w;
+    const sy = (-worldPos.y *  0.5 + 0.5) * h;
+
+    if (worldPos.z > 1) continue; // behind camera
+
+    const depth = worldPos.z;
+    const isSpecial = node.label === 'INIT' || node.label === 'RESULT' || node.status === 'active';
+    const baseAlpha = isSpecial ? 1.0 : Math.max(0, 1 - depth * 1.2);
+    if (baseAlpha < 0.05 && !isSpecial) continue;
+
+    const alpha = node.id === selectedNodeId ? 1.0 : baseAlpha;
+    const color = node.status === 'detour'   ? CSS.detour
+                : node.status === 'active'   ? CSS.active
+                : node.label === 'INIT'      ? CSS.init
+                : CSS.done;
+
+    labelCtx.globalAlpha = alpha;
+    labelCtx.fillStyle = color;
+
+    const meshRadius = mesh.geometry.parameters.radius ?? 3;
+    const labelY = sy - meshRadius * 1.2 - 6;
+
+    const text = node.label;
+    const maxLen = 20;
+    const display = text.length > maxLen ? text.slice(0, maxLen - 1) + '…' : text;
+    const tw = labelCtx.measureText(display).width;
+
+    // background pill
+    labelCtx.globalAlpha = alpha * 0.6;
+    labelCtx.fillStyle = '#0d1117';
+    labelCtx.beginPath();
+    labelCtx.roundRect(sx - tw / 2 - 4, labelY - 10, tw + 8, 14, 3);
+    labelCtx.fill();
+
+    labelCtx.globalAlpha = alpha;
+    labelCtx.fillStyle = color;
+    labelCtx.textAlign = 'center';
+    labelCtx.fillText(display, sx, labelY);
+  }
+  labelCtx.globalAlpha = 1;
+}
+
+// ── Hover / raycasting ────────────────────────────────────────────────────
+const raycaster = new THREE.Raycaster();
+const mouse2D   = new THREE.Vector2();
+const tooltip   = document.getElementById('tooltip');
+
+function handleHover(e) {
+  const rect = threeCanvas.getBoundingClientRect();
+  mouse2D.x =  ((e.clientX - rect.left)  / rect.width)  * 2 - 1;
+  mouse2D.y = -((e.clientY - rect.top)   / rect.height) * 2 + 1;
+
+  raycaster.setFromCamera(mouse2D, camera);
+  const meshList = Array.from(nodeMeshes.values());
+  const hits = raycaster.intersectObjects(meshList);
+
+  if (hits.length > 0) {
+    const mesh = hits[0].object;
+    hoveredNodeId = mesh._nodeId;
+    const node = graphData.nodes.find(n => n.id === mesh._nodeId);
+    if (node) {
+      tooltip.style.display = 'block';
+      tooltip.style.left    = (e.clientX + 14) + 'px';
+      tooltip.style.top     = (e.clientY - 6)  + 'px';
+      tooltip.innerHTML = \`<strong style="color:\${node.status==='active'?CSS.active:CSS.done}">\${escHtml(node.label)}</strong><br>
+        <span style="color:#8b949e">\${escHtml(node.layman || '')}</span><br>
+        <span style="color:#4b5563">\${node.status}</span>\`;
+    }
+  } else {
+    hoveredNodeId = null;
+    tooltip.style.display = 'none';
+  }
+}
+
+threeCanvas.addEventListener('click', e => {
+  const rect = threeCanvas.getBoundingClientRect();
+  mouse2D.x =  ((e.clientX - rect.left)  / rect.width)  * 2 - 1;
+  mouse2D.y = -((e.clientY - rect.top)   / rect.height) * 2 + 1;
+  raycaster.setFromCamera(mouse2D, camera);
+  const hits = raycaster.intersectObjects(Array.from(nodeMeshes.values()));
+  if (hits.length > 0) {
+    selectNode(hits[0].object._nodeId);
+  }
+});
+
+// ── Selection / detail panel ──────────────────────────────────────────────
+function selectNode(id) {
+  selectedNodeId = id;
+  const node = graphData.nodes.find(n => n.id === id);
+  const detail = document.getElementById('detailContent');
+  if (!node) {
+    detail.innerHTML = '<div class="detail-empty">Node not found</div>';
+    return;
+  }
+
+  // highlight in steps panel
+  document.querySelectorAll('.step-item').forEach(el => {
+    el.classList.toggle('selected', el.dataset.nodeId === id);
+  });
+
+  const statusClass = node.status || 'pending';
+  detail.innerHTML = \`
+    <div class="detail-field">
+      <div class="detail-field-label">Label</div>
+      <div class="detail-field-value" style="font-family:monospace">\${escHtml(node.label)}</div>
+    </div>
+    <div class="detail-field">
+      <div class="detail-field-label">Status</div>
+      <div class="detail-field-value"><span class="status-badge \${statusClass}">\${statusClass.toUpperCase()}</span></div>
+    </div>
+    \${node.layman ? \`
+    <div class="detail-field">
+      <div class="detail-field-label">Description</div>
+      <div class="detail-field-value">\${escHtml(node.layman)}</div>
+    </div>\` : ''}
+    \${node.cause ? \`
+    <div class="detail-field">
+      <div class="detail-field-label">Cause</div>
+      <div class="detail-field-value">\${escHtml(node.cause)}</div>
+    </div>\` : ''}
+    \${node.expect ? \`
+    <div class="detail-field">
+      <div class="detail-field-label">Expected</div>
+      <div class="detail-field-value">\${escHtml(node.expect)}</div>
+    </div>\` : ''}
+    \${node.startedAt ? \`
+    <div class="detail-field">
+      <div class="detail-field-label">Started</div>
+      <div class="detail-field-value" style="color:#6b7280">\${fmtTime(node.startedAt)}</div>
+    </div>\` : ''}
+    \${node.completedAt ? \`
+    <div class="detail-field">
+      <div class="detail-field-label">Completed</div>
+      <div class="detail-field-value" style="color:#6b7280">\${fmtTime(node.completedAt)}</div>
+    </div>\` : ''}
+    \${node.activity && node.activity.length > 0 ? \`
+    <div class="detail-field">
+      <div class="detail-field-label">Activity (\${node.activity.length})</div>
+      <div class="detail-field-value" style="color:#6b7280;font-size:10px;max-height:120px;overflow-y:auto">
+        \${node.activity.slice(-5).map(a => \`<div>\${escHtml(a.type || String(a))}</div>\`).join('')}
+      </div>
+    </div>\` : ''}
+  \`;
+}
+
+// ── Steps panel ────────────────────────────────────────────────────────────
+function updateStepsPanel() {
+  const list = document.getElementById('stepsList');
+  const nodes = graphData.nodes.filter(n => n.label !== 'TOOL');
+  list.innerHTML = nodes.map(node => {
+    const dotCls = node.status === 'active' ? 'active'
+                 : node.status === 'done'   ? 'done'
+                 : node.status === 'detour' ? 'detour'
+                 : 'pending';
+    return \`<div class="step-item" data-node-id="\${escAttr(node.id)}" onclick="window._selectNode('\${escAttr(node.id)}')">
+      <div class="step-dot \${dotCls}"></div>
+      <div>
+        <div class="step-label">\${escHtml(node.label)}</div>
+        \${node.layman ? \`<div class="step-layman">\${escHtml(node.layman.slice(0, 40))}</div>\` : ''}
+      </div>
+    </div>\`;
+  }).join('');
+}
+
+window._selectNode = (id) => selectNode(id);
+
+// ── Data fetch ─────────────────────────────────────────────────────────────
+async function fetchGraph() {
+  try {
+    const url = sessionId ? \`/api/graph/\${encodeURIComponent(sessionId)}\` : '/api/graph';
+    const res = await fetch(url);
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.nodes) {
+      graphData = { nodes: data.nodes, edges: data.edges || [] };
+    } else if (Array.isArray(data)) {
+      const allNodes = [], allEdges = [];
+      for (const g of data) {
+        allNodes.push(...(g.nodes || []));
+        allEdges.push(...(g.edges || []));
+      }
+      graphData = { nodes: allNodes, edges: allEdges };
+    }
+    // Ensure all nodes have positions (API already computes them, but fallback)
+    computeClientLayout(graphData.nodes, graphData.edges);
+    buildScene();
+  } catch(e) { /* silent */ }
+}
+
+async function fetchSessions() {
+  try {
+    const res = await fetch('/api/sessions');
+    if (!res.ok) return;
+    const body = await res.json();
+    const sessions = body.sessions || [];
+    const sel = document.getElementById('sessionSelect');
+    document.getElementById('sessionCount').textContent = sessions.length + ' session' + (sessions.length !== 1 ? 's' : '');
+    // populate dropdown
+    while (sel.options.length > 1) sel.remove(1);
+    for (const s of sessions) {
+      const opt = document.createElement('option');
+      opt.value = s.sessionId;
+      opt.textContent = s.sessionId.slice(0, 20) + (s.sessionId.length > 20 ? '…' : '');
+      sel.appendChild(opt);
+    }
+  } catch(e) { /* silent */ }
+}
+
+document.getElementById('sessionSelect').addEventListener('change', e => {
+  sessionId = e.target.value || null;
+  fetchGraph();
+  if (sseSource) {
+    sseSource.close();
+    connectSSE();
+  }
+});
+
+function updateNodeCount() {
+  document.getElementById('nodeCount').textContent = graphData.nodes.length + ' nodes';
+}
+
+// ── SSE ────────────────────────────────────────────────────────────────────
+function connectSSE() {
+  const url = sessionId
+    ? \`/api/events?sessionId=\${encodeURIComponent(sessionId)}\`
+    : '/api/events';
+
+  sseSource = new EventSource(url);
+
+  sseSource.addEventListener('open', () => {
+    setBadge(true);
+    document.getElementById('bottomStatus').textContent = 'Connected';
+  });
+
+  sseSource.addEventListener('error', () => {
+    setBadge(false);
+    document.getElementById('bottomStatus').textContent = 'Reconnecting…';
+  });
+
+  sseSource.addEventListener('graph:full', e => {
+    try {
+      const data = JSON.parse(e.data);
+      // Server sends { type, sessionId, graph: { nodes, edges, ... } }
+      const graph = data.graph || data;
+      graphData = { nodes: graph.nodes || [], edges: graph.edges || [] };
+      // Compute client-side radial layout for nodes without positions
+      computeClientLayout(graphData.nodes, graphData.edges);
+      buildScene();
+      fetchSessions();
+    } catch(_) {}
+  });
+
+  sseSource.addEventListener('node:added', e => {
+    try {
+      const data = JSON.parse(e.data);
+      // Server sends { type, sessionId, node }
+      const node = data.node;
+      if (node && !graphData.nodes.find(n => n.id === node.id)) {
+        graphData.nodes.push(node);
+        // Re-layout to position new node
+        computeClientLayout(graphData.nodes, graphData.edges);
+        buildScene();
+      }
+    } catch(_) {}
+  });
+
+  sseSource.addEventListener('node:updated', e => {
+    try {
+      const data = JSON.parse(e.data);
+      // Server sends { type, sessionId, nodeId, patch }
+      const nodeId = data.nodeId;
+      const patch = data.patch || {};
+      const idx = graphData.nodes.findIndex(n => n.id === nodeId);
+      if (idx >= 0) {
+        Object.assign(graphData.nodes[idx], patch);
+        buildScene();
+        if (selectedNodeId === nodeId) selectNode(nodeId);
+      }
+    } catch(_) {}
+  });
+
+  sseSource.addEventListener('edge:added', e => {
+    try {
+      const data = JSON.parse(e.data);
+      // Server sends { type, sessionId, edge }
+      const edge = data.edge;
+      if (edge && !graphData.edges.find(ex => ex.id === edge.id)) {
+        graphData.edges.push(edge);
+        // Re-layout with new edge info
+        computeClientLayout(graphData.nodes, graphData.edges);
+        buildScene();
+      }
+    } catch(_) {}
+  });
+
+  sseSource.addEventListener('progress', e => {
+    try {
+      const data = JSON.parse(e.data);
+      // Server sends { type, sessionId, progress }
+      setProgress(data.progress ?? 0);
+    } catch(_) {}
+  });
+}
+
+function setBadge(on) {
+  const b = document.getElementById('liveBadge');
+  b.classList.toggle('disconnected', !on);
+}
+
+function setProgress(pct) {
+  const clamped = Math.min(100, Math.max(0, pct));
+  document.getElementById('progressFill').style.width = clamped + '%';
+  document.getElementById('progressPct').textContent  = Math.round(clamped) + '%';
+}
+
+// ── Utilities ──────────────────────────────────────────────────────────────
+function escHtml(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function escAttr(s) {
+  return String(s ?? '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function fmtTime(iso) {
+  try { return new Date(iso).toLocaleTimeString(); } catch(_) { return iso; }
 }
 </script>
 </body>

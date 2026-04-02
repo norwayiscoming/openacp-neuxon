@@ -10,7 +10,7 @@ export default defineConfig({
   dts: true,
   clean: true,
   external: ["@openacp/cli", "sql.js", "@xenova/transformers", "onnxruntime-node", "sharp"],
-  noExternal: ["hono", "@hono/node-server", "nanoid", "zod", "@dagrejs/dagre"],
+  noExternal: ["hono", "@hono/node-server", "nanoid", "zod"],
   esbuildOptions(options) {
     options.resolveExtensions = [".ts", ".js", ".mjs"];
   },
