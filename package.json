@@ -1,6 +1,6 @@
 {
   "name": "openacp-neuxon",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "AI journey graph — visualize agent progress as a real-time knowledge graph",
   "license": "MIT",
   "type": "module",
