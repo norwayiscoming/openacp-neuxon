@@ -98,14 +98,10 @@ export function createNeuxonCommand(
         return { type: "text", text: "Refresh: re-send your last message and Neuxon will skip the cache." };
       }
 
-      // Default: show link
-      const sessionId = args.sessionId;
-      const url = sessionId
-        ? `${baseUrl}/?sessionId=${sessionId}`
-        : baseUrl;
+      // Default: show link (all sessions view — no sessionId param)
       return {
         type: "text",
-        text: `🧠 **Neuxon — AI Journey Graph**\n\nOpen in browser: ${url}`,
+        text: `🧠 **Neuxon — AI Journey Graph**\n\nOpen in browser: ${baseUrl}`,
       };
     },
   };

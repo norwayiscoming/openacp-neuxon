@@ -378,10 +378,11 @@ const CSS = {
 
 // ── State ──────────────────────────────────────────────────────────────────
 let graphData = { nodes: [], edges: [] };
-let sessionId = null;
+let sessionId = new URLSearchParams(window.location.search).get('sessionId') || null;
 let selectedNodeId = null;
 let hoveredNodeId = null;
 let sseSource = null;
+let pollTimer = null;
 let animationId = null;
 
 // camera pan state
@@ -408,7 +409,7 @@ const labelCtx    = labelCanvas.getContext('2d');
 initThree();
 fetchSessions();
 fetchGraph();
-connectSSE();
+startDataStream();
 
 // ── Three.js init ─────────────────────────────────────────────────────────
 function initThree() {
@@ -431,7 +432,7 @@ function initThree() {
   scene.add(grid);
 
   // Ambient light
-  scene.add(new THREE.AmbientLight(0xffffff, 0.2));
+  scene.add(new THREE.AmbientLight(0xffffff, 0.8));
 
   resize();
   window.addEventListener('resize', resize);
@@ -495,93 +496,68 @@ function updateCamera() {
   camera.lookAt(panX * 0.3, 0, panZ * 0.3);
 }
 
-// ── Client-side radial layout (for SSE-received nodes without positions) ──
+// ── Client-side force-directed layout ──
+// Physics simulation: nodes repel each other, edges attract, gravity pulls to center.
 function computeClientLayout(nodes, edges) {
   if (nodes.length === 0) return;
 
-  const children = new Map();
-  for (const e of edges) {
-    if (!children.has(e.from)) children.set(e.from, []);
-    children.get(e.from).push(e.to);
-  }
-
-  const root = nodes.find(n => n.label === 'INIT') || nodes[0];
-  if (root.x == null) { root.x = 0; root.y = 0; root.z = 0; }
-
-  const positioned = new Set();
-  // Keep nodes that already have positions
-  for (const n of nodes) {
-    if (n.x != null && n.y != null && n.z != null) positioned.add(n.id);
-  }
-  if (!positioned.has(root.id)) positioned.add(root.id);
-
-  const nodeMap = new Map(nodes.map(n => [n.id, n]));
-  const allRootChildren = children.get(root.id) || [];
-  // If only 1 branch from root, spread its sub-steps in an arc instead of a line
-  const angleStep = allRootChildren.length > 1
-    ? (2 * Math.PI) / allRootChildren.length
-    : Math.PI / 3; // 60 degree arc for single branch
-
-  let seed = 42;
+  let seed = 7;
   const rand = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
 
-  allRootChildren.forEach((childId, i) => {
-    const baseAngle = allRootChildren.length > 1
-      ? angleStep * i
-      : -Math.PI / 6; // start single branch slightly left
-    const queue = [{ id: childId, depth: 1, angle: baseAngle }];
-
-    while (queue.length > 0) {
-      const cur = queue.shift();
-      const node = nodeMap.get(cur.id);
-      if (!node || positioned.has(cur.id)) {
-        if (node) {
-          const ch = children.get(cur.id) || [];
-          ch.forEach((cid, j) => {
-            // Wider spread for branching: each child gets a distinct angle offset
-            const spread = ch.length > 1 ? 0.8 : 0.4;
-            const subAngle = cur.angle + (j - (ch.length - 1) / 2) * spread;
-            queue.push({ id: cid, depth: cur.depth + 1, angle: subAngle });
-          });
-        }
-        continue;
-      }
-      positioned.add(cur.id);
-
-      const dist = cur.depth * 80;
-      // Add progressive angle offset per depth to create an arc, not a line
-      const arcOffset = (allRootChildren.length <= 1) ? cur.depth * 0.15 : 0;
-      const finalAngle = cur.angle + arcOffset;
-
-      node.x = Math.cos(finalAngle) * dist + (rand() - 0.5) * 30;
-      node.y = (rand() - 0.5) * 20;
-      node.z = Math.sin(finalAngle) * dist + (rand() - 0.5) * 30;
-
-      const ch = children.get(cur.id) || [];
-      ch.forEach((cid, j) => {
-        const spread = ch.length > 1 ? 0.8 : 0.4;
-        const subAngle = finalAngle + (j - (ch.length - 1) / 2) * spread;
-        queue.push({ id: cid, depth: cur.depth + 1, angle: subAngle });
-      });
-    }
-  });
-
-  // Position any remaining unpositioned nodes near their parent
+  // Initialize positions
   for (const n of nodes) {
-    if (!positioned.has(n.id)) {
-      // Find parent from edges
-      const parentEdge = edges.find(e => e.to === n.id);
-      const parent = parentEdge ? nodeMap.get(parentEdge.from) : null;
-      if (parent && parent.x != null) {
-        n.x = parent.x + (rand() - 0.5) * 60;
-        n.y = (parent.y || 0) + (rand() - 0.5) * 20;
-        n.z = (parent.z || 0) + (rand() - 0.5) * 60;
-      } else {
-        n.x = (rand() - 0.5) * 100;
-        n.y = (rand() - 0.5) * 30;
-        n.z = (rand() - 0.5) * 100;
+    if (n.label === 'INIT') { n.x = 0; n.y = 0; n.z = 0; }
+    else { n.x = (rand() - 0.5) * 500; n.y = (rand() - 0.5) * 80; n.z = (rand() - 0.5) * 500; }
+  }
+
+  const nodeMap = new Map(nodes.map(n => [n.id, n]));
+  const REPULSION = 20000;
+  const SPRING = 0.015;
+  const SPRING_LEN = 150;
+  const GRAVITY = 0.005;
+  const DAMPING = 0.85;
+  const ITERATIONS = 300;
+
+  const vx = new Map(), vy = new Map(), vz = new Map();
+  for (const n of nodes) { vx.set(n.id, 0); vy.set(n.id, 0); vz.set(n.id, 0); }
+
+  for (let iter = 0; iter < ITERATIONS; iter++) {
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        const a = nodes[i], b = nodes[j];
+        let dx = a.x - b.x, dy = a.y - b.y, dz = a.z - b.z;
+        let dist = Math.sqrt(dx*dx + dy*dy + dz*dz) || 1;
+        const force = REPULSION / (dist * dist);
+        const fx = (dx/dist)*force, fy = (dy/dist)*force, fz = (dz/dist)*force;
+        vx.set(a.id, vx.get(a.id) + fx); vy.set(a.id, vy.get(a.id) + fy); vz.set(a.id, vz.get(a.id) + fz);
+        vx.set(b.id, vx.get(b.id) - fx); vy.set(b.id, vy.get(b.id) - fy); vz.set(b.id, vz.get(b.id) - fz);
       }
-      positioned.add(n.id);
+    }
+
+    for (const e of edges) {
+      const a = nodeMap.get(e.from), b = nodeMap.get(e.to);
+      if (!a || !b) continue;
+      let dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z;
+      let dist = Math.sqrt(dx*dx + dy*dy + dz*dz) || 1;
+      const force = SPRING * (dist - SPRING_LEN);
+      const fx = (dx/dist)*force, fy = (dy/dist)*force, fz = (dz/dist)*force;
+      vx.set(a.id, vx.get(a.id) + fx); vy.set(a.id, vy.get(a.id) + fy); vz.set(a.id, vz.get(a.id) + fz);
+      vx.set(b.id, vx.get(b.id) - fx); vy.set(b.id, vy.get(b.id) - fy); vz.set(b.id, vz.get(b.id) - fz);
+    }
+
+    for (const n of nodes) {
+      vx.set(n.id, vx.get(n.id) - n.x * GRAVITY);
+      vy.set(n.id, vy.get(n.id) - n.y * GRAVITY * 3);
+      vz.set(n.id, vz.get(n.id) - n.z * GRAVITY);
+    }
+
+    for (const n of nodes) {
+      if (n.label === 'INIT') continue;
+      const dvx = vx.get(n.id) * DAMPING, dvy = vy.get(n.id) * DAMPING, dvz = vz.get(n.id) * DAMPING;
+      n.x += Math.max(-30, Math.min(30, dvx));
+      n.y += Math.max(-15, Math.min(15, dvy));
+      n.z += Math.max(-30, Math.min(30, dvz));
+      vx.set(n.id, dvx); vy.set(n.id, dvy); vz.set(n.id, dvz);
     }
   }
 }
@@ -621,17 +597,12 @@ function buildScene() {
                 : node.label === 'INIT'    ? C.init
                 : node.status === 'active' ? C.active
                 : sessionColor;
-    const opacity = node.status === 'done'    ? 0.85
-                  : node.status === 'active'  ? 1.0
-                  : node.status === 'detour'  ? 0.9
-                  : 0.7;
+    const opacity = 1.0;
 
     const mat = new THREE.MeshStandardMaterial({
       color,
       emissive: color,
-      emissiveIntensity: node.status === 'active' ? 0.6 : 0.2,
-      transparent: true,
-      opacity,
+      emissiveIntensity: node.status === 'active' ? 0.8 : 0.4,
       roughness: 0.3,
       metalness: 0.4,
     });
@@ -668,8 +639,8 @@ function buildScene() {
     const geo  = new THREE.BufferGeometry().setFromPoints(pts);
     const mat  = new THREE.LineBasicMaterial({
       color: edge.type === 'detour' ? C.detour : sessionColor,
-      transparent: true,
-      opacity: 0.4,
+      transparent: false,
+      opacity: 1.0,
     });
     const line = new THREE.Line(geo, mat);
     scene.add(line);
@@ -897,7 +868,7 @@ function selectNode(id) {
     <div class="detail-field">
       <div class="detail-field-label">Activity (\${node.activity.length})</div>
       <div class="detail-field-value" style="color:#6b7280;font-size:10px;max-height:120px;overflow-y:auto">
-        \${node.activity.slice(-5).map(a => \`<div>\${escHtml(a.type || String(a))}</div>\`).join('')}
+        \${node.activity.slice(-5).map(a => \`<div>\${escHtml(a.action || '')} \${escHtml((a.text || '').slice(0, 60))}</div>\`).join('')}
       </div>
     </div>\` : ''}
   \`;
@@ -968,22 +939,40 @@ async function fetchSessions() {
 
 document.getElementById('sessionSelect').addEventListener('change', e => {
   sessionId = e.target.value || null;
+  stopDataStream();
   fetchGraph();
-  if (sseSource) {
-    sseSource.close();
-    connectSSE();
-  }
+  startDataStream();
 });
 
 function updateNodeCount() {
   document.getElementById('nodeCount').textContent = graphData.nodes.length + ' nodes';
 }
 
-// ── SSE ────────────────────────────────────────────────────────────────────
+// ── Data stream: SSE for single session, polling for all sessions ─────────
+
+function startDataStream() {
+  stopDataStream();
+  if (sessionId) {
+    // Single session → SSE for real-time
+    connectSSE();
+  } else {
+    // All sessions → poll every 2s (SSE events are per-session, can't merge)
+    setBadge(true);
+    document.getElementById('bottomStatus').textContent = 'Polling';
+    pollTimer = setInterval(() => {
+      fetchGraph();
+      fetchSessions();
+    }, 2000);
+  }
+}
+
+function stopDataStream() {
+  if (sseSource) { sseSource.close(); sseSource = null; }
+  if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+}
+
 function connectSSE() {
-  const url = sessionId
-    ? \`/api/events?sessionId=\${encodeURIComponent(sessionId)}\`
-    : '/api/events';
+  const url = \`/api/events?sessionId=\${encodeURIComponent(sessionId)}\`;
 
   sseSource = new EventSource(url);
 
@@ -1056,8 +1045,19 @@ function connectSSE() {
   sseSource.addEventListener('progress', e => {
     try {
       const data = JSON.parse(e.data);
-      // Server sends { type, sessionId, progress }
       setProgress(data.progress ?? 0);
+    } catch(_) {}
+  });
+
+  sseSource.addEventListener('activity', e => {
+    try {
+      const data = JSON.parse(e.data);
+      const node = graphData.nodes.find(n => n.id === data.nodeId);
+      if (node) {
+        if (!node.activity) node.activity = [];
+        node.activity.push(data.entry);
+        if (selectedNodeId === data.nodeId) selectNode(data.nodeId);
+      }
     } catch(_) {}
   });
 }

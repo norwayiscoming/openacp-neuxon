@@ -185,7 +185,7 @@ export class GraphBuilder {
       "NotebookEdit": { label: "Edit Notebook", desc: "Modifying a Jupyter notebook" },
     };
     const info = descriptions[toolName];
-    if (!info) return null;
+    if (!info) return { label: toolName, description: `Using ${toolName}` };
     const detail = content ? `: ${content.slice(0, 80)}` : "";
     return { label: info.label + detail.slice(0, 30), description: info.desc + detail };
   }
@@ -308,28 +308,49 @@ export class GraphBuilder {
       }
     }
 
-    // Add RESULT node — only connect to THIS turn's leaf nodes
+    // RESULT node — reuse existing one per session, or create if first turn
     const maxOrder = Math.max(0, ...graph.nodes.map((n) => n.order));
     const cleanResponse = (fullResponse ?? "")
       .replace(/\[STEP\s+name="[^"]*"\s+why="[^"]*"\s+expect="[^"]*"\s*\]/g, "")
       .trim();
-    const resultNode: GraphNode = {
-      id: nanoid(8),
-      label: "RESULT",
-      status: "done",
-      layman: cleanResponse || "The AI has finished and delivered the result.",
-      cause: "All steps are complete — here's what was produced.",
-      expect: "Done!",
-      techDetails: null,
-      activity: [],
-      startedAt: new Date().toISOString(),
-      completedAt: new Date().toISOString(),
-      order: maxOrder + 1,
-      fullAnswer: cleanResponse || null,
-    };
 
-    this.store.addNode(sessionId, resultNode);
-    this.onEvent({ type: "node:added", sessionId, node: resultNode });
+    let resultNode = graph.nodes.find((n) => n.label === "RESULT");
+    if (resultNode) {
+      // Update existing RESULT with latest response
+      resultNode.layman = cleanResponse || resultNode.layman;
+      resultNode.fullAnswer = cleanResponse || resultNode.fullAnswer;
+      resultNode.completedAt = new Date().toISOString();
+      resultNode.order = maxOrder + 1;
+      this.store.updateNode(sessionId, resultNode.id, {
+        layman: resultNode.layman,
+        fullAnswer: resultNode.fullAnswer,
+        completedAt: resultNode.completedAt,
+        order: resultNode.order,
+      });
+      this.onEvent({
+        type: "node:updated",
+        sessionId,
+        nodeId: resultNode.id,
+        patch: { layman: resultNode.layman, completedAt: resultNode.completedAt },
+      });
+    } else {
+      resultNode = {
+        id: nanoid(8),
+        label: "RESULT",
+        status: "done",
+        layman: cleanResponse || "The AI has finished and delivered the result.",
+        cause: "All steps are complete — here's what was produced.",
+        expect: "Done!",
+        techDetails: null,
+        activity: [],
+        startedAt: new Date().toISOString(),
+        completedAt: new Date().toISOString(),
+        order: maxOrder + 1,
+        fullAnswer: cleanResponse || null,
+      };
+      this.store.addNode(sessionId, resultNode);
+      this.onEvent({ type: "node:added", sessionId, node: resultNode });
+    }
 
     // Find leaf nodes from current turn only (no outgoing edges, were active this turn or are descendants of current phase)
     const nodesWithOutgoing = new Set(graph.edges.map((e) => e.from));

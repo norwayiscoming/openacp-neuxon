@@ -4,67 +4,85 @@ import type { GraphStore } from "./graph-store.js";
 import type { SSEEvent } from "./types.js";
 import { generateDashboardHtml } from "./templates/dashboard.js";
 
-function computeRadialLayout(nodes: any[], edges: any[]): void {
+function computeForceLayout(nodes: any[], edges: any[]): void {
   if (nodes.length === 0) return;
 
-  const children = new Map<string, string[]>();
-  for (const e of edges) {
-    if (!children.has(e.from)) children.set(e.from, []);
-    children.get(e.from)!.push(e.to);
-  }
-
-  const root = nodes.find((n) => n.label === "INIT") ?? nodes[0];
-  root.x = 0;
-  root.y = 0;
-  root.z = 0;
-
-  const positioned = new Set<string>([root.id]);
-  const nodeMap = new Map(nodes.map((n) => [n.id, n]));
-
-  const rootChildren = children.get(root.id) ?? [];
-  const angleStep = rootChildren.length > 1
-    ? (2 * Math.PI) / rootChildren.length
-    : Math.PI / 3;
-
-  let seed = 42;
+  let seed = 7;
   const rand = () => { seed = (seed * 16807 + 0) % 2147483647; return (seed - 1) / 2147483646; };
 
-  rootChildren.forEach((childId, i) => {
-    const baseAngle = rootChildren.length > 1
-      ? angleStep * i
-      : -Math.PI / 6;
-    const queue: Array<{ id: string; depth: number; angle: number }> = [
-      { id: childId, depth: 1, angle: baseAngle },
-    ];
-
-    while (queue.length > 0) {
-      const cur = queue.shift()!;
-      const node = nodeMap.get(cur.id);
-      if (!node || positioned.has(cur.id)) continue;
-      positioned.add(cur.id);
-
-      const dist = cur.depth * 80;
-      const arcOffset = rootChildren.length <= 1 ? cur.depth * 0.15 : 0;
-      const finalAngle = cur.angle + arcOffset;
-
-      node.x = Math.cos(finalAngle) * dist + (rand() - 0.5) * 30;
-      node.y = (rand() - 0.5) * 20;
-      node.z = Math.sin(finalAngle) * dist + (rand() - 0.5) * 30;
-
-      const nodeChildren = children.get(cur.id) ?? [];
-      const spread = nodeChildren.length > 1 ? 0.8 : 0.4;
-      nodeChildren.forEach((cid, j) => {
-        const subAngle = finalAngle + (j - (nodeChildren.length - 1) / 2) * spread;
-        queue.push({ id: cid, depth: cur.depth + 1, angle: subAngle });
-      });
-    }
-  });
-
+  // Initialize random positions
   for (const n of nodes) {
-    if (!positioned.has(n.id)) {
-      n.x = (rand() - 0.5) * 50;
-      n.y = (rand() - 0.5) * 30;
-      n.z = (rand() - 0.5) * 50;
+    if (n.label === "INIT") { n.x = 0; n.y = 0; n.z = 0; }
+    else { n.x = (rand() - 0.5) * 500; n.y = (rand() - 0.5) * 80; n.z = (rand() - 0.5) * 500; }
+  }
+
+  const nodeMap = new Map(nodes.map((n) => [n.id, n]));
+  const REPULSION = 20000;
+  const SPRING = 0.015;
+  const SPRING_LEN = 150;
+  const GRAVITY = 0.005;
+  const DAMPING = 0.85;
+  const ITERATIONS = 300;
+
+  // Velocity per node
+  const vx = new Map<string, number>();
+  const vy = new Map<string, number>();
+  const vz = new Map<string, number>();
+  for (const n of nodes) { vx.set(n.id, 0); vy.set(n.id, 0); vz.set(n.id, 0); }
+
+  for (let iter = 0; iter < ITERATIONS; iter++) {
+    // Repulsion between all pairs
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        const a = nodes[i], b = nodes[j];
+        let dx = a.x - b.x, dy = a.y - b.y, dz = a.z - b.z;
+        let dist = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1;
+        const force = REPULSION / (dist * dist);
+        const fx = (dx / dist) * force, fy = (dy / dist) * force, fz = (dz / dist) * force;
+        vx.set(a.id, vx.get(a.id)! + fx);
+        vy.set(a.id, vy.get(a.id)! + fy);
+        vz.set(a.id, vz.get(a.id)! + fz);
+        vx.set(b.id, vx.get(b.id)! - fx);
+        vy.set(b.id, vy.get(b.id)! - fy);
+        vz.set(b.id, vz.get(b.id)! - fz);
+      }
+    }
+
+    // Spring attraction along edges
+    for (const e of edges) {
+      const a = nodeMap.get(e.from), b = nodeMap.get(e.to);
+      if (!a || !b) continue;
+      let dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z;
+      let dist = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1;
+      const force = SPRING * (dist - SPRING_LEN);
+      const fx = (dx / dist) * force, fy = (dy / dist) * force, fz = (dz / dist) * force;
+      vx.set(a.id, vx.get(a.id)! + fx);
+      vy.set(a.id, vy.get(a.id)! + fy);
+      vz.set(a.id, vz.get(a.id)! + fz);
+      vx.set(b.id, vx.get(b.id)! - fx);
+      vy.set(b.id, vy.get(b.id)! - fy);
+      vz.set(b.id, vz.get(b.id)! - fz);
+    }
+
+    // Gravity toward center + flatten Y
+    for (const n of nodes) {
+      vx.set(n.id, vx.get(n.id)! - n.x * GRAVITY);
+      vy.set(n.id, vy.get(n.id)! - n.y * GRAVITY * 3); // stronger Y gravity = flatter
+      vz.set(n.id, vz.get(n.id)! - n.z * GRAVITY);
+    }
+
+    // Apply velocity with damping
+    for (const n of nodes) {
+      if (n.label === "INIT") continue; // pin INIT at origin
+      const dvx = vx.get(n.id)! * DAMPING;
+      const dvy = vy.get(n.id)! * DAMPING;
+      const dvz = vz.get(n.id)! * DAMPING;
+      n.x += Math.max(-30, Math.min(30, dvx));
+      n.y += Math.max(-15, Math.min(15, dvy));
+      n.z += Math.max(-30, Math.min(30, dvz));
+      vx.set(n.id, dvx);
+      vy.set(n.id, dvy);
+      vz.set(n.id, dvz);
     }
   }
 }
@@ -90,7 +108,7 @@ export function createNeuxonApp(store: GraphStore): Hono {
     if (!graph) return c.json({ error: "not found" }, 404);
     const nodes = graph.nodes.map((n) => ({ ...n }));
     const edges = graph.edges.map((e) => ({ ...e }));
-    computeRadialLayout(nodes, edges);
+    computeForceLayout(nodes, edges);
     return c.json({ ...graph, nodes, edges });
   });
 
@@ -135,7 +153,7 @@ export function createNeuxonApp(store: GraphStore): Hono {
       }
     }
 
-    computeRadialLayout(allNodes, allEdges);
+    computeForceLayout(allNodes, allEdges);
     return c.json({ nodes: allNodes, edges: allEdges });
   });
 
